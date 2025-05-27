@@ -1,0 +1,252 @@
+---
+title: "Análisis exploratorio"
+author: "Gustavo Amador Fonseca C20451"
+date: "2025-05-26"
+output: html_document
+---
+
+```{r}
+library(readr)
+data_raw <- read_csv("Dengue diseases dataset.csv")
+View(data_raw)
+```
+
+# Descripción general
+
+```{r}
+# Ver estructura general
+str(data_raw)
+#summary(data_raw)
+```
+
+Notar que hay valores 0 y 1, que se consideran double, cuando claramente puede ser booleanos, al igual que la variable Sex puede ser tomada como boolean, solo identificar bien como se etiquetan las variables para la interpretación.
+
+```{r}
+data_raw$`Differential Count` <- factor(data_raw$`Differential Count`, 
+                                        levels = c(0, 1), 
+                                        labels = c("No", "Yes"))
+
+data_raw$`RBC PANEL` <- factor(data_raw$`RBC PANEL`, 
+                               levels = c(0, 1), 
+                               labels = c("No", "Yes"))
+
+data_raw$`Final Output` <- factor(data_raw$`Final Output`, 
+                                  levels = c(0, 1), 
+                                  labels = c("Negative", "Positive"))
+View(data_raw)
+```
+
+```{r}
+# Ver si hay datos faltantes (NA)
+colSums(is.na(data_raw))
+```
+
+Se identifican valores faltantes en algunas varibles... no obstante comparado con el total de observaciones (1000) no se muestran tan significativas, se deben cosidaderar métodos para tratar estas observaciones o como rellenar.
+
+# Análisis univariado
+
+## Variables numéricas
+
+```{r}
+# Histograma
+hist(data_raw$Age, main = "Distribución de la edad", xlab = "Edad", col = "skyblue")
+
+hist(data_raw$Haemoglobin, main = "Distribución de la Haemoglobin", xlab = "Haemoglobin", col = "skyblue")
+
+hist(data_raw$`WBC Count`, main = "Distribución de la WBC Count", xlab = "WBC Count", col = "skyblue")
+
+hist(data_raw$`Platelet Count`, main = "Distribución de la Platelet Count", xlab = "Platelet Count", col = "skyblue")
+
+hist(data_raw$PDW, main = "Distribución de la PDW", xlab = "PDW", col = "skyblue")
+
+```
+
+```{r}
+# Boxplot
+boxplot(data_raw$Age, main = "Boxplot de la Edad", 
+        ylab = "Edad", 
+        col = "lightgreen", 
+        horizontal = TRUE)
+
+boxplot(data_raw$Haemoglobin, 
+        main = "Boxplot de la Haemoglobina", 
+        ylab = "Haemoglobina", 
+        col = "lightgreen", 
+        horizontal = TRUE)
+
+boxplot(data_raw$`WBC Count`, 
+        main = "Boxplot de la WBC Count", 
+        ylab = "WBC Count", 
+        col = "lightgreen", 
+        horizontal = TRUE)
+
+boxplot(data_raw$`Platelet Count`, 
+        main = "Boxplot de la Platelet Count", 
+        ylab = "Platelet Count", 
+        col = "lightgreen", 
+        horizontal = TRUE)
+
+boxplot(data_raw$PDW, 
+        main = "Boxplot de la PDW", 
+        ylab = "PDW", 
+        col = "lightgreen", 
+        horizontal = TRUE)
+
+```
+
+## Variables categóricas
+
+```{r}
+#table(data_raw$Sex)
+barplot(table(data_raw$Sex), col = "lightgreen", main = "Distribución del nivel educativo")
+
+
+barplot(table(data_raw$`Differential Count`), 
+        col = "lightblue", 
+        main = "Distribución de Differential Count",
+        ylab = "Frecuencia")
+
+
+barplot(table(data_raw$`RBC PANEL`), 
+        col = "lightcoral", 
+        main = "Distribución de RBC PANEL",
+        ylab = "Frecuencia")
+
+
+barplot(table(data_raw$`Final Output`), 
+        col = "lightgoldenrod", 
+        main = "Distribución de Final Output",
+        ylab = "Frecuencia")
+
+```
+
+# Análisis Bivariado
+
+```{r}
+# Gráfico de dispersión entre variables continuas
+plot(data_raw$Age, data_raw$Haemoglobin,
+     main = "Edad vs Haemoglobina",
+     xlab = "Edad", ylab = "Haemoglobina",
+     col = "steelblue", pch = 16)
+
+plot(data_raw$`WBC Count`, data_raw$`Platelet Count`,
+     main = "WBC Count vs Platelet Count",
+     xlab = "WBC Count", ylab = "Platelet Count",
+     col = "tomato", pch = 16)
+
+#plot(data_raw$PDW, data_raw$`Platelet Count`,
+#     main = "WBC Count vs Platelet Count",
+#     xlab = "WBC Count", ylab = "Platelet Count",
+#     col = "purple", pch = 16)
+
+# Correlaciones
+#cor(data_raw$Age, data_raw$Haemoglobin, use = "complete.obs")
+#cor(data_raw$`WBC Count`, data_raw$`Platelet Count`, use = "complete.obs")
+
+```
+
+
+```{r}
+# Boxplot de Haemoglobina según sexo
+boxplot(Haemoglobin ~ Sex, data = data_raw,
+        main = "Haemoglobina según Sexo",
+        col = c("skyblue", "salmon"),
+        ylab = "Haemoglobina")
+
+# Boxplot de WBC Count según resultado final
+boxplot(`WBC Count` ~ `Final Output`, data = data_raw,
+        main = "WBC Count según Final Output",
+        col = c("lightgreen", "gold"),
+        ylab = "WBC Count")
+
+# Boxplot de PDW según Differential Count
+boxplot(PDW ~ `Differential Count`, data = data_raw,
+        main = "PDW según Differential Count",
+        col = c("pink", "lightblue"),
+        ylab = "PDW")
+
+```
+
+```{r}
+# Tabla de contingencia
+tabla_dc_final <- table(data_raw$`Differential Count`, data_raw$`Final Output`)
+print(tabla_dc_final)
+
+# Barras agrupadas
+barplot(tabla_dc_final,
+        beside = TRUE,
+        col = c("lightblue", "lightpink"),
+        legend = TRUE,
+        main = "Final Output según Differential Count",
+        ylab = "Frecuencia")
+
+# Otra tabla: Sex vs Final Output
+tabla_sex_final <- table(data_raw$Sex, data_raw$`Final Output`)
+barplot(tabla_sex_final,
+        beside = TRUE,
+        col = c("lightcyan", "lightcoral"),
+        legend = TRUE,
+        main = "Final Output según Sexo")
+
+```
+
+```{r}
+library(corrplot)
+numeric_vars <- data_raw[, c("Age", "Haemoglobin", "WBC Count", "Platelet Count", "PDW")]
+
+# Matriz de correlación
+cor_matrix <- cor(numeric_vars, use = "complete.obs")
+
+# Gráfico
+corrplot(cor_matrix, method = "color", type = "upper", 
+         tl.col = "black", tl.srt = 45,
+         addCoef.col = "black", # muestra los coeficientes
+         col = colorRampPalette(c("red", "white", "blue"))(200))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
