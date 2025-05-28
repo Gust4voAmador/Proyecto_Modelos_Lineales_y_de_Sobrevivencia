@@ -27,6 +27,35 @@ View(data_clean)
 data_clean$`Dengue Diagnosis` <- as.logical(data_clean$`Dengue Diagnosis`)
 ```
 
+# Análisis de correlaciones
+```{r}
+library(ggcorrplot)
+library(dplyr)
+
+# Filtrar solo las variables numéricas
+datos_numericos <- data_clean %>%
+  select(where(is.numeric)) %>%
+  na.omit()  # eliminar NA para evitar errores en cor()
+
+# Calcular matriz de correlación
+cor_matrix <- cor(datos_numericos)
+
+# Visualizar la matriz con ggcorrplot
+ggcorrplot(cor_matrix,
+           method = "square",
+           type = "lower",
+           lab = TRUE,
+           lab_size = 2.5,
+           colors = c("#6D9EC1", "white", "#E46726"),
+           title = "Matriz de correlación entre todas las variables numéricas",
+           ggtheme = ggplot2::theme_minimal())
+
+```
+
+
+
+
+
 # Análisis descriptivo comparativo por grupo de diagnóstico
 
 Con el objetivo de identificar patrones relevantes entre variables hematológicas y el diagnóstico de dengue, se presentan a continuación los estadísticos descriptivos agrupados según el resultado de la variable Final Output. Se incluyen medidas de tendencia central y dispersión para hemoglobina, conteo de glóbulos blancos y plaquetas. Estas comparaciones permiten explorar si existen diferencias sustanciales entre pacientes con y sin dengue, que puedan justificar su inclusión en modelos predictivos posteriores.
@@ -124,7 +153,7 @@ La aparición de estos valores atípicos puede deberse a variabilidad individual
 ```{r}
 library(ggcorrplot)
 
-cor_matrix <- cor(datos %>% 
+cor_matrix <- cor(data_clean %>% 
                     select(Haemoglobin, `WBC Count`, `Platelet Count`) %>% 
                     na.omit())
 
@@ -139,19 +168,6 @@ ggcorrplot(cor_matrix,
 
 ```
 
-La Figura (anterior) muestra la matriz de correlación entre las variables hematológicas y demográficas incluidas en el estudio. Entre los hallazgos más relevantes destaca la fuerte correlación positiva (r = 0.75) entre el recuento de glóbulos blancos y el recuento de plaquetas, lo cual sugiere que ambas variables podrían verse afectadas de manera conjunta ante la presencia del dengue.
+Se destaca una fuerte correlación positiva (r = 0.75) entre el recuento de glóbulos blancos y el recuento de plaquetas. Este resultado sugiere que ambas variables podrían responder de forma conjunta a los procesos fisiopatológicos asociados al dengue. Dicha asociación también plantea la necesidad de considerar posibles problemas de multicolinealidad al incluir ambas variables como predictores en modelos estadísticos.
 
-Asimismo, se observa una correlación moderada (r = 0.45) entre PDW (Amplitud de Distribución Plaquetaria) y el recuento de plaquetas, indicando una posible relación entre la cantidad y la variabilidad del tamaño plaquetario. Por otra parte, la hemoglobina muestra correlaciones prácticamente nulas con el resto de variables, lo cual refuerza la conclusión anterior de que no constituye un indicador discriminante entre pacientes con y sin dengue.
-
-
-
-
-
-
-
-
-
-
-
-
-
+Por su parte, la variable hemoglobina presenta correlaciones prácticamente nulas tanto con el recuento de leucocitos (r = 0.00) como con el de plaquetas (r = 0.04), lo cual refuerza la conclusión obtenida en análisis anteriores: la hemoglobina no parece ser un indicador relevante para discriminar entre pacientes con y sin dengue.
