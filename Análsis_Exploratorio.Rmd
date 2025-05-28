@@ -7,6 +7,8 @@ output: html_document
 
 ```{r}
 library(readr)
+library(dplyr)
+
 data_raw <- read_csv("Dengue diseases dataset.csv")
 View(data_raw)
 ```
@@ -20,6 +22,11 @@ str(data_raw)
 ```
 
 Notar que hay valores 0 y 1, que se consideran double, cuando claramente puede ser booleanos, al igual que la variable Sex puede ser tomada como boolean, solo identificar bien como se etiquetan las variables para la interpretación.
+
+
+
+
+
 
 ```{r}
 data_raw$`Differential Count` <- factor(data_raw$`Differential Count`, 

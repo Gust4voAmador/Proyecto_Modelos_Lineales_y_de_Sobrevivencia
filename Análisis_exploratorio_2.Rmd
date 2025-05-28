@@ -1,0 +1,157 @@
+---
+title: "Analisis 2"
+author: "Gustavo Amador Fonseca C20451"
+date: "2025-05-28"
+output: html_document
+---
+
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+data_raw <- read_csv("Dengue diseases dataset.csv", show_col_types = FALSE)
+```
+
+# Limpieza de Datos
+
+```{r}
+#Creación de copia del df original (crudo)
+data_clean <- data_raw
+names(data_clean)[9] <- "Dengue Diagnosis"
+View(data_clean)
+```
+
+```{r}
+#Hacer varibla que determina el dengue booleana
+data_clean$`Dengue Diagnosis` <- as.logical(data_clean$`Dengue Diagnosis`)
+```
+
+# Análisis descriptivo comparativo por grupo de diagnóstico
+
+Con el objetivo de identificar patrones relevantes entre variables hematológicas y el diagnóstico de dengue, se presentan a continuación los estadísticos descriptivos agrupados según el resultado de la variable Final Output. Se incluyen medidas de tendencia central y dispersión para hemoglobina, conteo de glóbulos blancos y plaquetas. Estas comparaciones permiten explorar si existen diferencias sustanciales entre pacientes con y sin dengue, que puedan justificar su inclusión en modelos predictivos posteriores.
+
+```{r}
+# Calcular resumen estadístico por grupo de diagnóstico
+tabla_resumen <- data_clean %>%
+  group_by(`Dengue Diagnosis`) %>%
+  summarise(
+    Haemoglobin_mean = round(mean(Haemoglobin, na.rm = TRUE), 2),
+    Haemoglobin_sd = round(sd(Haemoglobin, na.rm = TRUE), 2),
+    Haemoglobin_median = round(median(Haemoglobin, na.rm = TRUE), 2)
+  )
+
+# Mostrar tabla
+print(tabla_resumen)
+```
+
+Al analizar los niveles de hemoglobina según el diagnóstico de dengue, se observa que en promedio, los pacientes sin dengue presentan un valor medio de hemoglobina de 13.72 g/dL, mientras que aquellos con dengue muestran un promedio de 13.71 g/dL. Las medianas también son cercanas. En cuanto a la dispersión, medida a través de la desviación estándar, se nota una ligera mayor variabilidad en el grupo sin dengue (1.53) en comparación con el grupo con dengue (1.47).
+
+Estas métricas sugieren que no existen diferencias relevantes en los niveles de hemoglobina entre los pacientes con y sin diagnóstico de dengue. Esto indica que la variable hemoglobine no discrimina de forma clara entre los grupos evaluados.
+
+```{r}
+tabla_resumen <- data_clean %>%
+  group_by(`Dengue Diagnosis`) %>%
+  summarise(
+    WBC_Count_mean = round(mean(`WBC Count`, na.rm = TRUE), 2),
+    WBC_Count_sd = round(sd(`WBC Count`, na.rm = TRUE), 2),
+    WBC_Count_median = round(median(`WBC Count`, na.rm = TRUE), 2)
+  )
+
+# Mostrar tabla
+print(tabla_resumen)
+```
+
+Al analizar la variable cuantitativa continua que representa el número total de leucocitos por microlitro (WBC Count), se observa que, en promedio, los pacientes sin diagnóstico de dengue presentan un valor de 7448.40$\ \text{leucocitos}/\mu\text{L}$, mientras que aquellos con diagnóstico positivo tienen un promedio considerablemente menor, de 2851.91 $\ \text{leucocitos}/\mu\text{L}$. Esta diferencia también se refleja en las medianas, con 7500 y 2900, respectivamente. En cuanto a la dispersión, medida por la desviación estándar, se evidencia una mayor variabilidad en el grupo sin dengue (1477.83) en comparación con el grupo con dengue (494.03).
+
+Estas métricas sugieren que existen diferencias notables en los niveles de leucocitos entre ambos grupos, lo que indica que la variable WBC Count posee capacidad discriminativa en el contexto del diagnóstico de dengue.
+
+```{r}
+tabla_resumen <- data_clean %>%
+  group_by(`Dengue Diagnosis`) %>%
+  summarise(
+    Platelet_Count_mean = round(mean(`Platelet Count`, na.rm = TRUE), 2),
+    Platelet_Count_sd = round(sd(`Platelet Count`, na.rm = TRUE), 2),
+    Platelet_Count_median = round(median(`Platelet Count`, na.rm = TRUE), 2)
+  )
+
+# Mostrar tabla
+print(tabla_resumen)
+```
+
+Al analizar la variable cuantitativa continua que representa el recuento de plaquetas por microlitro (Platelet Count), se observa que, en promedio, los pacientes sin diagnóstico de dengue presentan un valor de 216246.52 $\ \text{plaquetas}/\mu\text{L}$, mientras que aquellos con diagnóstico positivo tienen un promedio considerablemente menor, de 65862.07 $\ \text{plaquetas}/\mu\text{L}$. Esta diferencia también se refleja en las medianas, con 180,000 y 64,000, respectivamente. En cuanto a la dispersión, medida por la desviación estándar, se evidencia una mayor variabilidad en el grupo sin dengue (78897.00) en comparación con el grupo con dengue (38769.77).
+
+Estas métricas sugieren que existen diferencias marcadas en los niveles de plaquetas entre ambos grupos, lo que indica que la variable Platelet Count podría ser útil para discriminar casos de dengue.
+
+## Boxplots
+
+En la Figura (siguiente) se muestran los diagramas de caja para tres variables hematológicas analizadas, visualizando su distribución entre pacientes con y sin diagnóstico positivo de dengue (Dengue Diagnosis) y como confirmación visual de la de análsis anterior:
+
+```{r}
+# Boxplot Haemoglobin
+p1 <- ggplot(data_clean, aes(x = factor(`Dengue Diagnosis`), y = Haemoglobin)) +
+  geom_boxplot(fill = "#69b3a2") +
+  labs(title = "Haemoglobina por diagnóstico", x = "Diagnóstico de dengue", y = "g/dL") +
+  theme_minimal()
+
+# Boxplot WBC Count
+p2 <- ggplot(data_clean, aes(x = factor(`Dengue Diagnosis`), y = `WBC Count`)) +
+  geom_boxplot(fill = "#f9a825") +
+  labs(title = "Recuento de glóbulos blancos", x = "Diagnóstico de dengue", y = "células/µL") +
+  theme_minimal()
+
+# Boxplot Platelet Count
+p3 <- ggplot(data_clean, aes(x = factor(`Dengue Diagnosis`), y = `Platelet Count`)) +
+  geom_boxplot(fill = "#ef5350") +
+  labs(title = "Recuento de plaquetas", x = "Diagnóstico de dengue", y = "células/µL") +
+  theme_minimal()
+```
+
+```{r}
+# Mostrar juntos (si usás patchwork o gridExtra)
+library(patchwork)
+p1 + p2 + p3
+```
+
+Los diagramas confirman visualmente los hallazgos previamente discutidos, mostrando menores valores de leucocitos y plaquetas en los pacientes con diagnóstico positivo, además se verifica que la distribución de la hemoglobina no muestra una variación clara en su distribución que dependa del diagnóstico. Además se puede visualizar y confirmar una mayor dispersión en el grupo sin dengue para el caso de plaquetas y globulos blacos.
+
+En los diagramas de caja se observa la presencia de valores atípicos, especialmente en el recuento de plaquetas del grupo sin diagnóstico positivo, donde algunos casos superan ampliamente las 400,000 plaquetas/µL. También para el grupo sin dengue se aprecia un valor extremo en hemoglobina y en glóbulos blancos se muestran valores muy grandes lejos de la media, pero sin considerarsen atípicos según el diagrama de caja.
+
+La aparición de estos valores atípicos puede deberse a variabilidad individual, posibles errores de medición o casos clínicamente atípicos, unque no afectan significativamente las medianas.
+
+## Correlación entre variables hematológicas
+
+```{r}
+library(ggcorrplot)
+
+cor_matrix <- cor(datos %>% 
+                    select(Haemoglobin, `WBC Count`, `Platelet Count`) %>% 
+                    na.omit())
+
+ggcorrplot(cor_matrix,
+           method = "square",
+           type = "lower",
+           lab = TRUE,
+           lab_size = 5,
+           colors = c("#6D9EC1", "white", "#E46726"),
+           title = "Matriz de correlación entre variables hematológicas",
+           ggtheme = ggplot2::theme_minimal())
+
+```
+
+La Figura (anterior) muestra la matriz de correlación entre las variables hematológicas y demográficas incluidas en el estudio. Entre los hallazgos más relevantes destaca la fuerte correlación positiva (r = 0.75) entre el recuento de glóbulos blancos y el recuento de plaquetas, lo cual sugiere que ambas variables podrían verse afectadas de manera conjunta ante la presencia del dengue.
+
+Asimismo, se observa una correlación moderada (r = 0.45) entre PDW (Amplitud de Distribución Plaquetaria) y el recuento de plaquetas, indicando una posible relación entre la cantidad y la variabilidad del tamaño plaquetario. Por otra parte, la hemoglobina muestra correlaciones prácticamente nulas con el resto de variables, lo cual refuerza la conclusión anterior de que no constituye un indicador discriminante entre pacientes con y sin dengue.
+
+
+
+
+
+
+
+
+
+
+
+
+
