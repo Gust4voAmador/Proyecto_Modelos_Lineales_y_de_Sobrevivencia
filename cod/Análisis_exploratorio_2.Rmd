@@ -21,7 +21,8 @@ library(dplyr)
 library(ggplot2)
 library(ggcorrplot)
 
-data_raw <- read_csv("Dengue diseases dataset.csv", show_col_types = FALSE)
+data_raw <- read_csv("../data/Dengue diseases dataset.csv", show_col_types = FALSE)
+
 ```
 
 # Limpieza de Datos
@@ -35,7 +36,7 @@ names(data_clean)[9] <- "Dengue Diagnosis"
 
 ```{r}
 #Hacer varibla que determina el dengue booleana
-data_clean$`Dengue Diagnosis` <- as.logical(data_clean$`Dengue Diagnosis`)
+#data_clean$`Dengue Diagnosis` <- as.logical(data_clean$`Dengue Diagnosis`)
 ```
 
 # Análisis de correlaciones entre variables predictores
@@ -54,28 +55,35 @@ datos_numericos <- data_clean %>%
 cor_matrix <- cor(datos_numericos)
 
 # Visualizar la matriz con ggcorrplot
-ggcorrplot(cor_matrix,
-           method = "square",
-           type = "lower",
-           lab = TRUE,
-           lab_size = 2.5,
-           colors = c("#6D9EC1", "white", "#E46726"),
-           title = "Matriz de correlación entre variables",
-           ggtheme = ggplot2::theme_minimal())
-
+plot_corr <- ggcorrplot(cor_matrix,
+             method = "square",
+             type = "lower",
+             lab = TRUE,
+             lab_size = 2.5,
+             colors = c("#6D9EC1", "white", "#E46726"),
+             #title = "Matriz de correlación entre variables",
+             ggtheme = ggplot2::theme_minimal())
+print(plot_corr)
 ```
+```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
+# Cambia esta ruta por la que desees usar
+ruta_guardado <- "../img/matriz_correlacion.png"
+
+ggsave(filename = ruta_guardado,
+       plot = plot_corr,
+       width = 8,
+       height = 6,
+       dpi = 300)
+```
+
 
 Entre los hallazgos más relevantes destaca la **fuerte correlación positiva** (r = 0.75) entre el recuento de glóbulos blancos (*WBC Count*) y el recuento de plaquetas (*Platelet Count*). Esta relación indica la posibilidad de que ambas variables sean afectadas simultáneamente por procesos clínicos relacionados. Esta asociación también alerta sobre una posible **colinealidad**, que deberá ser considerada en la selección de predictores.
 
 También se observa una correlación menos fuerte (r = 0.45) entre *Platelet Count* y *PDW*, lo que indica una posible relación entre la cantidad de plaquetas y la variabilidad de su tamaño, esto puede tener implicaciones biológicas.
 
-En cambio, la variable *Hemoglobin* presenta correlaciones muy bajas con el resto de variables (r ≈ 0), lo que sugiere que no está linealmente asociada con los otros marcadores hematológicos. Esto puede indicar una capacidad limitada para utilizarse como predictor diagnóstico.
+En cambio, la variable *Hemoglobin* presenta correlaciones muy bajas con el resto de variables (r ≈ 0), lo que sugiere que no está linealmente asociada con los otros marcadores hematológicos. No obstante, esto no es indicador de poca importancia al momento de ajustar un modelo estadístico. Las variables binarias como *Differential Count* y *RBC PANEL* muestran correlaciones bajas con las demás, aunque mantienen leves asociaciones positivas con *WBC Count* y *Platelet Count*, lo que podría reflejar su rol como indicadores clínicos consolidados de riesgo hematológico.
 
-Las variables binarias como *Differential Count* y *RBC PANEL* muestran correlaciones bajas con las demás, aunque mantienen leves asociaciones positivas con *WBC Count* y *Platelet Count*, lo que podría reflejar su rol como indicadores clínicos consolidados de riesgo hematológico.
-
-También se puede observar correlaciones ligeras con la variable edad (Age) y los indicadores hematológicos, lo cual tambien puede sugerir que estos pueden variar por con forme las personas avanzan de edad por razones biológicas.
-
-Este análisis inicial de correlación proporciona una base para la selección de variables y justifica decisiones metodológicas posteriores, como la eliminación de predictores redundantes o el uso de técnicas que controlen multicolinealidad.
+También se puede observar correlaciones ligeras con la variable edad (Age) y los indicadores hematológicos, lo cual tambien puede sugerir que estos pueden variar por con forme las personas avanzan de edad por razones biológicas. Sin embargo, la variable edad como la de sexo no son consieradas en este análisis, ya que no forman parte de variables hematológicas. Este análisis inicial de correlación proporciona una base para la selección de variables y justifica decisiones metodológicas posteriores, como la eliminación de predictores redundantes o el uso de técnicas que controlen multicolinealidad.
 
 # Análisis de variables binarias
 
@@ -96,19 +104,30 @@ data_plot <- data_clean %>%
   mutate(Proporcion = Frecuencia / sum(Frecuencia))
 
 # Gráfico
-ggplot(data_plot, aes(x = `Dengue Diagnosis`, y = Proporcion, fill = `Dengue Diagnosis`)) +
-  geom_col() +
-  geom_text(aes(label = paste0(Frecuencia, " obs")), vjust = -0.5) +
-  scale_y_continuous(labels = scales::percent_format(), limits = c(0, 1.1)) +
-  labs(
-    x = "Valor de Dengue Diagnosis",
-    y = "Proporción del total",
-    title = "Distribución de Dengue Diagnosis",
-    fill = "Valor"
-  ) +
-  scale_fill_manual(values = c("0" = "gray70", "1" = "steelblue", "NA" = "darkred")) +
-  theme_minimal()
+distri_dengue_diagnosis <- ggplot(data_plot, aes(x = `Dengue Diagnosis`, y = Proporcion, fill = `Dengue Diagnosis`)) +
+                              geom_col() +
+                              geom_text(aes(label = paste0(Frecuencia, " obs")), vjust = -0.5) +
+                              scale_y_continuous(labels = scales::percent_format(), limits = c(0, 1.1)) +
+                              labs(
+                                x = "Valor de Dengue Diagnosis",
+                                y = "Proporción del total",
+                                #title = "Distribución de Dengue Diagnosis",
+                                fill = "Valor"
+                              ) +
+                              scale_fill_manual(values = c("0" = "gray70", "1" = "steelblue", "NA" = "darkred")) +
+                              theme_minimal()
+print(distri_dengue_diagnosis)
+```
 
+```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
+# Cambia esta ruta por la que desees usar
+ruta_guardado <- "../img/Distribucion_Dengue_Diagnosis.png"
+
+ggsave(filename = ruta_guardado,
+       plot = distri_dengue_diagnosis,
+       width = 8,
+       height = 6,
+       dpi = 300)
 ```
 
 La variable `Dengue Diagnosis`, que representa la presencia o ausencia de diagnóstico positivo por dengue, muestra un desequilibrio en la distribución de clases. Según se observa en el gráfico, un total de 669 observaciones (66.7%) corresponden a casos positivos (valor 1), mientras que 320 observaciones (32%) corresponden a casos negativos (valor 0). Además, existen 14 registros sin información (NA), lo cual representa un 1.4% del total de datos, siendo una cantidad poco significativa en la base de datos.
@@ -129,7 +148,7 @@ data_plot <- data_clean %>%
   )
 
 # Gráfico
-ggplot(data_plot, aes(x = `Differential Count`, fill = `Differential Count`)) +
+dif_count <- ggplot(data_plot, aes(x = `Differential Count`, fill = `Differential Count`)) +
   geom_bar() +
   facet_wrap(~`Dengue Diagnosis`) +
   labs(
@@ -140,6 +159,17 @@ ggplot(data_plot, aes(x = `Differential Count`, fill = `Differential Count`)) +
   scale_fill_manual(values = c("0" = "gray70", "1" = "steelblue")) +
   theme_minimal()
 
+print(dif_count)
+```
+```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
+# Cambia esta ruta por la que desees usar
+ruta_guardado <- "../img/Distribucion_Differential_Count.png"
+
+ggsave(filename = ruta_guardado,
+       plot = dif_count,
+       width = 8,
+       height = 6,
+       dpi = 300)
 ```
 
 El gráfico muestra la distribución de la variable `Differential Count` según el diagnóstico de dengue. En ambos grupos (diagnóstico positivo y negativo), se observa una mayor frecuencia de pacientes con `Differential Count = 1`, lo que indica que las alteraciones en el conteo diferencial de leucocitos son comunes en la muestra.
@@ -163,17 +193,27 @@ data_plot <- data_clean %>%
   )
 
 # Gráfico
-ggplot(data_plot, aes(x = `RBC PANEL`, fill = `RBC PANEL`)) +
-  geom_bar() +
-  facet_wrap(~`Dengue Diagnosis`) +
-  labs(
-    title = "Distribución de RBC PANEL según diagnóstico de dengue",
-    x = "RBC PANEL",
-    y = "Frecuencia"
-  ) +
-  scale_fill_manual(values = c("0" = "gray70", "1" = "steelblue")) +
-  theme_minimal()
+rbc <- ggplot(data_plot, aes(x = `RBC PANEL`, fill = `RBC PANEL`)) +
+        geom_bar() +
+        facet_wrap(~`Dengue Diagnosis`) +
+        labs(
+          #title = "Distribución de RBC PANEL según diagnóstico de dengue",
+          x = "RBC PANEL",
+          y = "Frecuencia"
+        ) +
+        scale_fill_manual(values = c("0" = "gray70", "1" = "steelblue")) +
+        theme_minimal()
+print(rbc)
+```
+```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
+# Cambia esta ruta por la que desees usar
+ruta_guardado <- "../img/Distribucion_RBC_PANEL.png"
 
+ggsave(filename = ruta_guardado,
+       plot = rbc,
+       width = 8,
+       height = 6,
+       dpi = 300)
 ```
 
 En la distribución de la variable `RBC PANEL` según el diagnóstico de dengue, se observa que la mayoría de los pacientes presentan alteraciones en el panel eritrocitario (`RBC PANEL = 1`), tanto en el grupo con dengue como en el grupo sin diagnóstico.
@@ -288,11 +328,30 @@ p4 <- ggplot(data_clean, aes(x = factor(`Dengue Diagnosis`), y = PDW)) +
 ```{r, echo = FALSE, warning= FALSE}
 # Mostrar juntos (si usás patchwork o gridExtra)
 library(patchwork)
-p1 + p2
+boxplot1 <- p1 + p2
+boxplot1
 ```
 
 ```{r, echo = FALSE, warning= FALSE}
-p3 + p4
+boxplot2 <- p3 + p4
+boxplot2
+```
+```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
+# Cambia esta ruta por la que desees usar
+ruta_guardado1 <- "../img/Boxplot1.png"
+ruta_guardado2 <- "../img/Boxplot2.png"
+
+ggsave(filename = ruta_guardado1,
+       plot = boxplot1,
+       width = 8,
+       height = 6,
+       dpi = 300)
+
+ggsave(filename = ruta_guardado2,
+       plot = boxplot2,
+       width = 8,
+       height = 6,
+       dpi = 300)
 ```
 
 Los diagramas de caja permiten confirmar visualmente los patrones observados en el análisis realizado anteriormente con las tablas. En general, los pacientes con diagnóstico positivo de dengue presentan menores valores en el recuento de glóbulos blancos, recuento de plaquetas y PDW, en comparación con los pacientes sin dengue. Esto sugiere una afectación consistente del sistema hematológico en presencia de la infección, tanto en cantidad celular como en variabilidad morfológica. En contraste, la variable hemoglobina muestra distribuciones similares entre grupos, con medianas cercanas y sin diferencias apreciables.
