@@ -2,13 +2,24 @@
 title: "Analisis 2"
 author: "Gustavo Amador Fonseca C20451"
 date: "2025-05-28"
-output: html_document
+output:
+  prettydoc::html_pretty:
+    theme: cayman  # Puedes cambiar a 'tactile' o 'architect' si prefieres
+    #toc: true  # Mostrar tabla de contenidos
+    toc_depth: 2  # Profundidad de la tabla de contenidos
+    highlight: github  # Estilo de resaltado de sintaxis
+    fig_width: 8
+    fig_height: 5
+extra_dependencies:
+  - amsmath
+  - someotherpackagee
 ---
 
-```{r}
+```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
 library(readr)
 library(dplyr)
 library(ggplot2)
+library(ggcorrplot)
 
 data_raw <- read_csv("Dengue diseases dataset.csv", show_col_types = FALSE)
 ```
@@ -29,12 +40,11 @@ data_clean$`Dengue Diagnosis` <- as.logical(data_clean$`Dengue Diagnosis`)
 
 # Análisis de correlaciones entre variables predictores
 
+Recordar que el enálisis es para variables que se realcione con la pregunta, por eso se descarta edad y sexo.
+
 Para esto se considera la matriz de correlación de Pearson calculada entre todas las variables numéricas del conjunto de datos, incluyendo variables continuas y binarias codificadas como 0 y 1. El análisis de esta matriz permite identificar relaciones lineales entre los predictores y detectar posibles casos de colinealidad que podrían afectar los modelos estadísticos posteriores.
 
-```{r}
-library(ggcorrplot)
-library(dplyr)
-
+```{r, echo = FALSE, warning= FALSE}
 # Filtrar solo las variables numéricas
 datos_numericos <- data_clean %>%
   select(where(is.numeric)) %>%
@@ -67,6 +77,109 @@ También se puede observar correlaciones ligeras con la variable edad (Age) y lo
 
 Este análisis inicial de correlación proporciona una base para la selección de variables y justifica decisiones metodológicas posteriores, como la eliminación de predictores redundantes o el uso de técnicas que controlen multicolinealidad.
 
+# Análisis de variables binarias
+
+## Dengue Diagnosis
+
+```{r, echo = FALSE, warning= FALSE, results='hide'}
+data_clean$`Dengue Diagnosis`
+
+# Reemplazar NA por etiqueta explícita
+data_plot <- data_clean %>%
+  mutate(`Dengue Diagnosis` = case_when(
+    is.na(`Dengue Diagnosis`) ~ "NA",
+    `Dengue Diagnosis` == 1 ~ "1",
+    `Dengue Diagnosis` == 0 ~ "0"
+  )) %>%
+  group_by(`Dengue Diagnosis`) %>%
+  summarise(Frecuencia = n()) %>%
+  mutate(Proporcion = Frecuencia / sum(Frecuencia))
+
+# Gráfico
+ggplot(data_plot, aes(x = `Dengue Diagnosis`, y = Proporcion, fill = `Dengue Diagnosis`)) +
+  geom_col() +
+  geom_text(aes(label = paste0(Frecuencia, " obs")), vjust = -0.5) +
+  scale_y_continuous(labels = scales::percent_format(), limits = c(0, 1.1)) +
+  labs(
+    x = "Valor de Dengue Diagnosis",
+    y = "Proporción del total",
+    title = "Distribución de Dengue Diagnosis",
+    fill = "Valor"
+  ) +
+  scale_fill_manual(values = c("0" = "gray70", "1" = "steelblue", "NA" = "darkred")) +
+  theme_minimal()
+
+```
+
+La variable `Dengue Diagnosis`, que representa la presencia o ausencia de diagnóstico positivo por dengue, muestra un desequilibrio en la distribución de clases. Según se observa en el gráfico, un total de 669 observaciones (66.7%) corresponden a casos positivos (valor 1), mientras que 320 observaciones (32%) corresponden a casos negativos (valor 0). Además, existen 14 registros sin información (NA), lo cual representa un 1.4% del total de datos, siendo una cantidad poco significativa en la base de datos.
+
+Se evidencia un sesgo hacia los casos positivos, sugiriendo que la muestra está centrada en pacientes que presentaron síntomas compatibles con la enfermedad, lo cual es esperable. No obstante, este desbalance debe ser considerado en la selección y evaluación de modelos estadísticos, ya que podría afectar el rendimiento y la interpretación de los resultados.
+
+Asimismo, la presencia de observaciones faltantes (NA) deberá ser abordada en el proceso de limpieza o imputación de datos, dependiendo del enfoque metodológico que se adopte.
+
+## Differential Count
+
+```{r, echo = FALSE, warning= FALSE}
+# Preparar los datos
+data_plot <- data_clean %>%
+  filter(!is.na(`Dengue Diagnosis`)) %>%
+  mutate(
+    `Differential Count` = factor(`Differential Count`, levels = c(0, 1)),
+    `Dengue Diagnosis` = ifelse(`Dengue Diagnosis` == 1, "Positive", "Negative")
+  )
+
+# Gráfico
+ggplot(data_plot, aes(x = `Differential Count`, fill = `Differential Count`)) +
+  geom_bar() +
+  facet_wrap(~`Dengue Diagnosis`) +
+  labs(
+    title = "Distribución de Differential Count según diagnóstico de dengue",
+    x = "Differential Count",
+    y = "Frecuencia"
+  ) +
+  scale_fill_manual(values = c("0" = "gray70", "1" = "steelblue")) +
+  theme_minimal()
+
+```
+
+El gráfico muestra la distribución de la variable `Differential Count` según el diagnóstico de dengue. En ambos grupos (diagnóstico positivo y negativo), se observa una mayor frecuencia de pacientes con `Differential Count = 1`, lo que indica que las alteraciones en el conteo diferencial de leucocitos son comunes en la muestra.
+
+No obstante, el grupo con diagnóstico positivo presenta una concentración aún mayor en el valor 1, mientras que en el grupo negativo también predominan los valores 1 pero con una presencia algo más visible del valor 0. Esta diferencia podría sugerir una cierta relación entre la presencia de alteraciones en el conteo diferencial y el diagnóstico de dengue.
+
+Sin embargo, dado el desbalance en el número de observaciones entre los grupos (mayoría de casos positivos), esta diferencia debe interpretarse con cuidado. Para evaluar si esta variable tiene valor discriminativo real, sería necesario complementar el análisis visual con una medida de asociación relativa o aplicar un modelo que controle por el desequilibrio de clases.
+
+## RBC PANEL
+
+```{r, echo = FALSE, warning= FALSE}
+library(ggplot2)
+library(dplyr)
+
+# Preparar los datos
+data_plot <- data_clean %>%
+  filter(!is.na(`RBC PANEL`)) %>%
+  mutate(
+    `RBC PANEL` = factor(`RBC PANEL`, levels = c(0, 1)),
+    `Dengue Diagnosis` = ifelse(`Dengue Diagnosis` == 1, "Positive", "Negative")
+  )
+
+# Gráfico
+ggplot(data_plot, aes(x = `RBC PANEL`, fill = `RBC PANEL`)) +
+  geom_bar() +
+  facet_wrap(~`Dengue Diagnosis`) +
+  labs(
+    title = "Distribución de RBC PANEL según diagnóstico de dengue",
+    x = "RBC PANEL",
+    y = "Frecuencia"
+  ) +
+  scale_fill_manual(values = c("0" = "gray70", "1" = "steelblue")) +
+  theme_minimal()
+
+```
+
+En la distribución de la variable `RBC PANEL` según el diagnóstico de dengue, se observa que la mayoría de los pacientes presentan alteraciones en el panel eritrocitario (`RBC PANEL = 1`), tanto en el grupo con dengue como en el grupo sin diagnóstico.
+
+Aunque el grupo positivo concentra una mayor cantidad de casos con `RBC PANEL = 1`, esta tendencia debe interpretarse con cautela debido al desequilibrio en el número de observaciones entre los grupos. En términos generales, el gráfico sugiere que las alteraciones en el panel de glóbulos rojos son frecuentes en la muestra, pero no muestra una diferenciación visual clara entre los estados diagnósticos.
+
 # Análisis de variables numéricas
 
 ## Análisis descriptivo comparativo por grupo de diagnóstico
@@ -75,7 +188,7 @@ Con el objetivo de identificar patrones relevantes entre variables hematológica
 
 ### Hemoglobina
 
-```{r}
+```{r, echo = FALSE, warning= FALSE}
 # Calcular resumen estadístico por grupo de diagnóstico
 tabla_resumen <- data_clean %>%
   group_by(`Dengue Diagnosis`) %>%
@@ -93,7 +206,7 @@ En promedio, los niveles de hemoglobina son similares entre pacientes con y sin 
 
 ### WBC_Count
 
-```{r}
+```{r, echo = FALSE, warning= FALSE}
 tabla_resumen <- data_clean %>%
   group_by(`Dengue Diagnosis`) %>%
   summarise(
@@ -110,7 +223,7 @@ Los pacientes con diagnóstico positivo de dengue presentan un recuento promedio
 
 ### Platelet Count
 
-```{r}
+```{r, echo = FALSE, warning= FALSE}
 tabla_resumen <- data_clean %>%
   group_by(`Dengue Diagnosis`) %>%
   summarise(
@@ -127,7 +240,7 @@ Los pacientes con diagnóstico de dengue presentan un recuento de plaquetas much
 
 ### PDW
 
-```{r}
+```{r, echo = FALSE, warning= FALSE}
 tabla_resumen <- data_clean %>%
   group_by(`Dengue Diagnosis`) %>%
   summarise(
@@ -146,7 +259,7 @@ El valor de PDW, que representa la variabilidad en el tamaño de las plaquetas, 
 
 En la Figura (siguiente) se muestran los diagramas de caja para las variables hematológicas numéricas, visualizando su distribución entre pacientes con y sin diagnóstico positivo de dengue (Dengue Diagnosis) y como confirmación visual de la de análsis anterior:
 
-```{r}
+```{r, echo = FALSE, warning= FALSE}
 # Boxplot Haemoglobin
 p1 <- ggplot(data_clean, aes(x = factor(`Dengue Diagnosis`), y = Haemoglobin)) +
   geom_boxplot(fill = "#69b3a2") +
@@ -172,15 +285,15 @@ p4 <- ggplot(data_clean, aes(x = factor(`Dengue Diagnosis`), y = PDW)) +
   theme_minimal()
 ```
 
-```{r, warning=FALSE}
+```{r, echo = FALSE, warning= FALSE}
 # Mostrar juntos (si usás patchwork o gridExtra)
 library(patchwork)
 p1 + p2
 ```
-```{r, warning=FALSE}
+
+```{r, echo = FALSE, warning= FALSE}
 p3 + p4
 ```
-
 
 Los diagramas de caja permiten confirmar visualmente los patrones observados en el análisis realizado anteriormente con las tablas. En general, los pacientes con diagnóstico positivo de dengue presentan menores valores en el recuento de glóbulos blancos, recuento de plaquetas y PDW, en comparación con los pacientes sin dengue. Esto sugiere una afectación consistente del sistema hematológico en presencia de la infección, tanto en cantidad celular como en variabilidad morfológica. En contraste, la variable hemoglobina muestra distribuciones similares entre grupos, con medianas cercanas y sin diferencias apreciables.
 
@@ -188,27 +301,11 @@ También se observa una mayor dispersión en los valores de leucocitos, plaqueta
 
 Los gráficos revelan la presencia de valores atípicos, especialmente en el recuento de plaquetas en pacientes sin dengue, con varios casos que superan las 400,000 células/µL. Se observan también outliers en PDW en el grupo positivo, y un valor extremo aislado en hemoglobina. Aunque estos valores no afectan significativamente las medianas, podrían estar relacionados con respuestas fisiológicas particulares, errores de medición o casos clínicos poco comunes.
 
+# Conclusión
 
-# Análisis de variable
+A partir de las tablas y gráficos presentados, se observa que variables como el recuento de glóbulos blancos, el recuento de plaquetas y la amplitud de distribución plaquetaria muestran diferencias claras entre los grupos de diagnóstico, lo que sugiere su potencial utilidad en la etapa de modelado. En cambio, variables como la hemoglobina no presentan patrones diferenciales marcados, por lo que podrían tener un menor valor discriminativo.
 
-```{r}
-library(ggcorrplot)
+En cuanto a las variables binarias, se identificaron patrones diferenciales principalmente en `Differential Count`, cuya proporción de casos alterados fue mayor entre los pacientes con diagnóstico positivo. En contraste, variables como `RBC PANEL` mostraron distribuciones más similares entre grupos. Estas observaciones respaldan la inclusión de algunas variables binarias como posibles predictores categóricos, aunque su utilidad deberá evaluarse rigurosamente en la etapa de modelado.
 
-cor_matrix <- cor(data_clean %>% 
-                    select(Haemoglobin, `WBC Count`, `Platelet Count`) %>% 
-                    na.omit())
+Dado que algunas variables muestran alta correlación, será importante aplicar estrategias que consideren la multicolinealidad. Las observaciones extraídas en esta etapa exploratoria servirán como base para la definición de un modelo. En particular, la selección de variables y el tratamiento de posibles colinealidades serán aspectos clave para garantizar la validez del enfoque estadístico.
 
-ggcorrplot(cor_matrix,
-           method = "square",
-           type = "lower",
-           lab = TRUE,
-           lab_size = 5,
-           colors = c("#6D9EC1", "white", "#E46726"),
-           title = "Matriz de correlación entre variables hematológicas",
-           ggtheme = ggplot2::theme_minimal())
-
-```
-
-Se destaca una fuerte correlación positiva (r = 0.75) entre el recuento de glóbulos blancos y el recuento de plaquetas. Este resultado sugiere que ambas variables podrían responder de forma conjunta a los procesos fisiopatológicos asociados al dengue. Dicha asociación también plantea la necesidad de considerar posibles problemas de multicolinealidad al incluir ambas variables como predictores en modelos estadísticos.
-
-Por su parte, la variable hemoglobina presenta correlaciones prácticamente nulas tanto con el recuento de leucocitos (r = 0.00) como con el de plaquetas (r = 0.04), lo cual refuerza la conclusión obtenida en análisis anteriores: la hemoglobina no parece ser un indicador relevante para discriminar entre pacientes con y sin dengue.
