@@ -19,7 +19,7 @@ data_raw <- read_csv("Dengue diseases dataset.csv", show_col_types = FALSE)
 #Creación de copia del df original (crudo)
 data_clean <- data_raw
 names(data_clean)[9] <- "Dengue Diagnosis"
-View(data_clean)
+#View(data_clean)
 ```
 
 ```{r}
@@ -27,7 +27,10 @@ View(data_clean)
 data_clean$`Dengue Diagnosis` <- as.logical(data_clean$`Dengue Diagnosis`)
 ```
 
-# Análisis de correlaciones
+# Análisis de correlaciones entre variables predictores
+
+Para esto se considera la matriz de correlación de Pearson calculada entre todas las variables numéricas del conjunto de datos, incluyendo variables continuas y binarias codificadas como 0 y 1. El análisis de esta matriz permite identificar relaciones lineales entre los predictores y detectar posibles casos de colinealidad que podrían afectar los modelos estadísticos posteriores.
+
 ```{r}
 library(ggcorrplot)
 library(dplyr)
@@ -47,18 +50,30 @@ ggcorrplot(cor_matrix,
            lab = TRUE,
            lab_size = 2.5,
            colors = c("#6D9EC1", "white", "#E46726"),
-           title = "Matriz de correlación entre todas las variables numéricas",
+           title = "Matriz de correlación entre variables",
            ggtheme = ggplot2::theme_minimal())
 
 ```
 
+Entre los hallazgos más relevantes destaca la **fuerte correlación positiva** (r = 0.75) entre el recuento de glóbulos blancos (*WBC Count*) y el recuento de plaquetas (*Platelet Count*). Esta relación indica la posibilidad de que ambas variables sean afectadas simultáneamente por procesos clínicos relacionados. Esta asociación también alerta sobre una posible **colinealidad**, que deberá ser considerada en la selección de predictores.
 
+También se observa una correlación menos fuerte (r = 0.45) entre *Platelet Count* y *PDW*, lo que indica una posible relación entre la cantidad de plaquetas y la variabilidad de su tamaño, esto puede tener implicaciones biológicas.
 
+En cambio, la variable *Hemoglobin* presenta correlaciones muy bajas con el resto de variables (r ≈ 0), lo que sugiere que no está linealmente asociada con los otros marcadores hematológicos. Esto puede indicar una capacidad limitada para utilizarse como predictor diagnóstico.
 
+Las variables binarias como *Differential Count* y *RBC PANEL* muestran correlaciones bajas con las demás, aunque mantienen leves asociaciones positivas con *WBC Count* y *Platelet Count*, lo que podría reflejar su rol como indicadores clínicos consolidados de riesgo hematológico.
 
-# Análisis descriptivo comparativo por grupo de diagnóstico
+También se puede observar correlaciones ligeras con la variable edad (Age) y los indicadores hematológicos, lo cual tambien puede sugerir que estos pueden variar por con forme las personas avanzan de edad por razones biológicas.
 
-Con el objetivo de identificar patrones relevantes entre variables hematológicas y el diagnóstico de dengue, se presentan a continuación los estadísticos descriptivos agrupados según el resultado de la variable Final Output. Se incluyen medidas de tendencia central y dispersión para hemoglobina, conteo de glóbulos blancos y plaquetas. Estas comparaciones permiten explorar si existen diferencias sustanciales entre pacientes con y sin dengue, que puedan justificar su inclusión en modelos predictivos posteriores.
+Este análisis inicial de correlación proporciona una base para la selección de variables y justifica decisiones metodológicas posteriores, como la eliminación de predictores redundantes o el uso de técnicas que controlen multicolinealidad.
+
+# Análisis de variables numéricas
+
+## Análisis descriptivo comparativo por grupo de diagnóstico
+
+Con el objetivo de identificar patrones relevantes entre variables hematológicas y el diagnóstico de dengue, se presentan a continuación los estadísticos descriptivos agrupados según el resultado de la variable Final Dengue Dianosis. Estas comparaciones permiten explorar si existen diferencias sustanciales entre pacientes con y sin dengue, que puedan justificar su inclusión en metodologías estadísticas posteriores.
+
+### Hemoglobina
 
 ```{r}
 # Calcular resumen estadístico por grupo de diagnóstico
@@ -74,9 +89,9 @@ tabla_resumen <- data_clean %>%
 print(tabla_resumen)
 ```
 
-Al analizar los niveles de hemoglobina según el diagnóstico de dengue, se observa que en promedio, los pacientes sin dengue presentan un valor medio de hemoglobina de 13.72 g/dL, mientras que aquellos con dengue muestran un promedio de 13.71 g/dL. Las medianas también son cercanas. En cuanto a la dispersión, medida a través de la desviación estándar, se nota una ligera mayor variabilidad en el grupo sin dengue (1.53) en comparación con el grupo con dengue (1.47).
+En promedio, los niveles de hemoglobina son similares entre pacientes con y sin diagnóstico de dengue (13.71 vs 13.72 g/dL), con medianas prácticamente iguales y una ligera mayor dispersión en el grupo sin dengue. Estas diferencias no parecen clínicamente relevantes, lo que sugiere que la hemoglobina no es un buen discriminador entre los grupos analizados.
 
-Estas métricas sugieren que no existen diferencias relevantes en los niveles de hemoglobina entre los pacientes con y sin diagnóstico de dengue. Esto indica que la variable hemoglobine no discrimina de forma clara entre los grupos evaluados.
+### WBC_Count
 
 ```{r}
 tabla_resumen <- data_clean %>%
@@ -91,9 +106,9 @@ tabla_resumen <- data_clean %>%
 print(tabla_resumen)
 ```
 
-Al analizar la variable cuantitativa continua que representa el número total de leucocitos por microlitro (WBC Count), se observa que, en promedio, los pacientes sin diagnóstico de dengue presentan un valor de 7448.40$\ \text{leucocitos}/\mu\text{L}$, mientras que aquellos con diagnóstico positivo tienen un promedio considerablemente menor, de 2851.91 $\ \text{leucocitos}/\mu\text{L}$. Esta diferencia también se refleja en las medianas, con 7500 y 2900, respectivamente. En cuanto a la dispersión, medida por la desviación estándar, se evidencia una mayor variabilidad en el grupo sin dengue (1477.83) en comparación con el grupo con dengue (494.03).
+Los pacientes con diagnóstico positivo de dengue presentan un recuento promedio de glóbulos blancos notablemente menor (2851.91 células/µL) en comparación con quienes no tienen dengue (7448.40 células/µL). Esta diferencia también se refleja en las medianas (2900 vs 7500) y en una menor dispersión. Estas observaciones sugieren que el recuento de leucocitos podría ser útil para discriminar entre casos positivos y negativos de dengue.
 
-Estas métricas sugieren que existen diferencias notables en los niveles de leucocitos entre ambos grupos, lo que indica que la variable WBC Count posee capacidad discriminativa en el contexto del diagnóstico de dengue.
+### Platelet Count
 
 ```{r}
 tabla_resumen <- data_clean %>%
@@ -108,13 +123,28 @@ tabla_resumen <- data_clean %>%
 print(tabla_resumen)
 ```
 
-Al analizar la variable cuantitativa continua que representa el recuento de plaquetas por microlitro (Platelet Count), se observa que, en promedio, los pacientes sin diagnóstico de dengue presentan un valor de 216246.52 $\ \text{plaquetas}/\mu\text{L}$, mientras que aquellos con diagnóstico positivo tienen un promedio considerablemente menor, de 65862.07 $\ \text{plaquetas}/\mu\text{L}$. Esta diferencia también se refleja en las medianas, con 180,000 y 64,000, respectivamente. En cuanto a la dispersión, medida por la desviación estándar, se evidencia una mayor variabilidad en el grupo sin dengue (78897.00) en comparación con el grupo con dengue (38769.77).
+Los pacientes con diagnóstico de dengue presentan un recuento de plaquetas mucho menor (media: 65,862; mediana: 64,000) en comparación con los pacientes sin dengue (media: 216,246; mediana: 180,000). Además, la dispersión es más alta en el grupo sin dengue. Estas diferencias refuerzan el potencial del recuento plaquetario como variable útil para discriminar casos positivos.
 
-Estas métricas sugieren que existen diferencias marcadas en los niveles de plaquetas entre ambos grupos, lo que indica que la variable Platelet Count podría ser útil para discriminar casos de dengue.
+### PDW
+
+```{r}
+tabla_resumen <- data_clean %>%
+  group_by(`Dengue Diagnosis`) %>%
+  summarise(
+    PDW_mean = round(mean(PDW, na.rm = TRUE), 2),
+    PDW_sd = round(sd(PDW, na.rm = TRUE), 2),
+    PDW_median = round(median(PDW, na.rm = TRUE), 2)
+  )
+
+# Mostrar tabla
+print(tabla_resumen)
+```
+
+El valor de PDW, que representa la variabilidad en el tamaño de las plaquetas, muestra diferencias claras entre los grupos. En los pacientes sin dengue, la media y mediana son considerablemente más altas (30.29 y 35, respectivamente), mientras que en los pacientes con diagnóstico positivo se reducen a 19.34 y 17. Esto sugiere una menor diversidad en el tamaño plaquetario en presencia de la enfermedad. Estas diferencias podrían ser relevantes para entender la dinámica hematológica asociada al dengue.
 
 ## Boxplots
 
-En la Figura (siguiente) se muestran los diagramas de caja para tres variables hematológicas analizadas, visualizando su distribución entre pacientes con y sin diagnóstico positivo de dengue (Dengue Diagnosis) y como confirmación visual de la de análsis anterior:
+En la Figura (siguiente) se muestran los diagramas de caja para las variables hematológicas numéricas, visualizando su distribución entre pacientes con y sin diagnóstico positivo de dengue (Dengue Diagnosis) y como confirmación visual de la de análsis anterior:
 
 ```{r}
 # Boxplot Haemoglobin
@@ -134,21 +164,32 @@ p3 <- ggplot(data_clean, aes(x = factor(`Dengue Diagnosis`), y = `Platelet Count
   geom_boxplot(fill = "#ef5350") +
   labs(title = "Recuento de plaquetas", x = "Diagnóstico de dengue", y = "células/µL") +
   theme_minimal()
+
+# Boxplot PDW
+p4 <- ggplot(data_clean, aes(x = factor(`Dengue Diagnosis`), y = PDW)) +
+  geom_boxplot(fill = "#B2FFFF") +
+  labs(title = "Amplitud de Distribución Plaquetaria", x = "Diagnóstico de dengue", y = "% de variabilidad en tamaño") +
+  theme_minimal()
 ```
 
-```{r}
+```{r, warning=FALSE}
 # Mostrar juntos (si usás patchwork o gridExtra)
 library(patchwork)
-p1 + p2 + p3
+p1 + p2
+```
+```{r, warning=FALSE}
+p3 + p4
 ```
 
-Los diagramas confirman visualmente los hallazgos previamente discutidos, mostrando menores valores de leucocitos y plaquetas en los pacientes con diagnóstico positivo, además se verifica que la distribución de la hemoglobina no muestra una variación clara en su distribución que dependa del diagnóstico. Además se puede visualizar y confirmar una mayor dispersión en el grupo sin dengue para el caso de plaquetas y globulos blacos.
 
-En los diagramas de caja se observa la presencia de valores atípicos, especialmente en el recuento de plaquetas del grupo sin diagnóstico positivo, donde algunos casos superan ampliamente las 400,000 plaquetas/µL. También para el grupo sin dengue se aprecia un valor extremo en hemoglobina y en glóbulos blancos se muestran valores muy grandes lejos de la media, pero sin considerarsen atípicos según el diagrama de caja.
+Los diagramas de caja permiten confirmar visualmente los patrones observados en el análisis realizado anteriormente con las tablas. En general, los pacientes con diagnóstico positivo de dengue presentan menores valores en el recuento de glóbulos blancos, recuento de plaquetas y PDW, en comparación con los pacientes sin dengue. Esto sugiere una afectación consistente del sistema hematológico en presencia de la infección, tanto en cantidad celular como en variabilidad morfológica. En contraste, la variable hemoglobina muestra distribuciones similares entre grupos, con medianas cercanas y sin diferencias apreciables.
 
-La aparición de estos valores atípicos puede deberse a variabilidad individual, posibles errores de medición o casos clínicamente atípicos, unque no afectan significativamente las medianas.
+También se observa una mayor dispersión en los valores de leucocitos, plaquetas y PDW en el grupo sin dengue, lo que podría indicar una mayor heterogeneidad en las respuestas hematológicas entre estos pacientes.
 
-## Correlación entre variables hematológicas
+Los gráficos revelan la presencia de valores atípicos, especialmente en el recuento de plaquetas en pacientes sin dengue, con varios casos que superan las 400,000 células/µL. Se observan también outliers en PDW en el grupo positivo, y un valor extremo aislado en hemoglobina. Aunque estos valores no afectan significativamente las medianas, podrían estar relacionados con respuestas fisiológicas particulares, errores de medición o casos clínicos poco comunes.
+
+
+# Análisis de variable
 
 ```{r}
 library(ggcorrplot)
