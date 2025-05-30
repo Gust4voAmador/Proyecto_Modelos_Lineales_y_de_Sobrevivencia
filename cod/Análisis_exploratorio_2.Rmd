@@ -226,7 +226,7 @@ Aunque el grupo positivo concentra una mayor cantidad de casos con `RBC PANEL = 
 
 Con el objetivo de identificar patrones relevantes entre variables hematológicas y el diagnóstico de dengue, se presentan a continuación los estadísticos descriptivos agrupados según el resultado de la variable Final Dengue Dianosis. Estas comparaciones permiten explorar si existen diferencias sustanciales entre pacientes con y sin dengue, que puedan justificar su inclusión en metodologías estadísticas posteriores.
 
-### Hemoglobina
+### Hemoglobin
 
 ```{r, echo = FALSE, warning= FALSE}
 # Calcular resumen estadístico por grupo de diagnóstico
