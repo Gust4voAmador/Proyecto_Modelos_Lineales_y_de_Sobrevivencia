@@ -59,7 +59,7 @@ plot_corr <- ggcorrplot(cor_matrix,
              method = "square",
              type = "lower",
              lab = TRUE,
-             lab_size = 2.5,
+             lab_size = 4,
              colors = c("#6D9EC1", "white", "#E46726"),
              #title = "Matriz de correlación entre variables",
              ggtheme = ggplot2::theme_minimal())
@@ -91,7 +91,6 @@ También se puede observar correlaciones ligeras con la variable edad (Age) y lo
 
 ```{r, echo = FALSE, warning= FALSE, results='hide'}
 data_clean$`Dengue Diagnosis`
-
 # Reemplazar NA por etiqueta explícita
 data_plot <- data_clean %>%
   mutate(`Dengue Diagnosis` = case_when(
@@ -105,18 +104,28 @@ data_plot <- data_clean %>%
 
 # Gráfico
 distri_dengue_diagnosis <- ggplot(data_plot, aes(x = `Dengue Diagnosis`, y = Proporcion, fill = `Dengue Diagnosis`)) +
-                              geom_col() +
-                              geom_text(aes(label = paste0(Frecuencia, " obs")), vjust = -0.5) +
-                              scale_y_continuous(labels = scales::percent_format(), limits = c(0, 1.1)) +
-                              labs(
-                                x = "Valor de Dengue Diagnosis",
-                                y = "Proporción del total",
-                                #title = "Distribución de Dengue Diagnosis",
-                                fill = "Valor"
-                              ) +
-                              scale_fill_manual(values = c("0" = "gray70", "1" = "steelblue", "NA" = "darkred")) +
-                              theme_minimal()
+  geom_col(width = 0.6) +
+  geom_text(aes(label = paste0(Frecuencia, " obs")), vjust = -0.5, size = 4.5) +
+  scale_y_continuous(labels = scales::percent_format(), limits = c(0, 1.1)) +
+  labs(
+    x = "Valor de Dengue Diagnosis",
+    y = "Proporción del total",
+    #title = "Distribución de Dengue Diagnosis",
+    fill = "Valor"
+  ) +
+  scale_fill_manual(values = c("0" = "gray70", "1" = "steelblue", "NA" = "darkred")) +
+  theme_minimal(base_size = 10) +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 14, face = "bold"),
+    axis.text = element_text(size = 11),
+    strip.text = element_text(size = 14, face = "bold"),
+    legend.text = element_text(size = 11),
+    legend.title = element_text(size = 11)
+  )
+
 print(distri_dengue_diagnosis)
+
 ```
 
 ```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
@@ -149,17 +158,26 @@ data_plot <- data_clean %>%
 
 # Gráfico
 dif_count <- ggplot(data_plot, aes(x = `Differential Count`, fill = `Differential Count`)) +
-  geom_bar() +
+  geom_bar(width = 0.6) +
   facet_wrap(~`Dengue Diagnosis`) +
   labs(
-    title = "Distribución de Differential Count según diagnóstico de dengue",
+    #title = "Distribución de Differential Count según diagnóstico de dengue",
     x = "Differential Count",
     y = "Frecuencia"
   ) +
   scale_fill_manual(values = c("0" = "gray70", "1" = "steelblue")) +
-  theme_minimal()
+  theme_minimal(base_size = 10) +  # Tamaño base del texto
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5), # Título centrado y más grande
+    axis.title = element_text(size = 14, face = "bold"),
+    axis.text = element_text(size = 11),
+    strip.text = element_text(size = 14, face = "bold"),
+    legend.text = element_text(size = 11),
+    legend.title = element_text(size = 11)
+  )
 
 print(dif_count)
+
 ```
 ```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
 # Cambia esta ruta por la que desees usar
@@ -181,9 +199,6 @@ Sin embargo, dado el desbalance en el número de observaciones entre los grupos 
 ## RBC PANEL
 
 ```{r, echo = FALSE, warning= FALSE}
-library(ggplot2)
-library(dplyr)
-
 # Preparar los datos
 data_plot <- data_clean %>%
   filter(!is.na(`RBC PANEL`)) %>%
@@ -194,15 +209,22 @@ data_plot <- data_clean %>%
 
 # Gráfico
 rbc <- ggplot(data_plot, aes(x = `RBC PANEL`, fill = `RBC PANEL`)) +
-        geom_bar() +
-        facet_wrap(~`Dengue Diagnosis`) +
-        labs(
-          #title = "Distribución de RBC PANEL según diagnóstico de dengue",
-          x = "RBC PANEL",
-          y = "Frecuencia"
-        ) +
-        scale_fill_manual(values = c("0" = "gray70", "1" = "steelblue")) +
-        theme_minimal()
+  geom_bar(width = 0.6) +
+  facet_wrap(~`Dengue Diagnosis`) +
+  labs(
+    x = "RBC PANEL",
+    y = "Frecuencia"
+  ) +
+  scale_fill_manual(values = c("0" = "gray70", "1" = "steelblue")) +
+  theme_minimal(base_size = 10) +  # Tamaño base del texto
+  theme(
+    axis.title = element_text(size = 14, face = "bold"),      # Títulos de los ejes
+    axis.text = element_text(size = 11),                      # Texto en los ejes
+    strip.text = element_text(size = 14, face = "bold"),      # Etiquetas de facetas
+    legend.text = element_text(size = 11),                    # Texto de leyenda
+    legend.title = element_text(size = 11)                    # Título de leyenda
+  )
+
 print(rbc)
 ```
 ```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
@@ -328,7 +350,7 @@ p4 <- ggplot(data_clean, aes(x = factor(`Dengue Diagnosis`), y = PDW)) +
 ```{r, echo = FALSE, warning= FALSE}
 # Mostrar juntos (si usás patchwork o gridExtra)
 library(patchwork)
-boxplot1 <- p1 + p2
+boxplot1 <- p1 + p2 + p3 + p4
 boxplot1
 ```
 
