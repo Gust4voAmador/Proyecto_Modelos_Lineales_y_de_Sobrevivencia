@@ -1,0 +1,154 @@
+---
+title: "Untitled"
+author: "Gustavo Amador Fonseca C20451"
+date: "2025-06-06"
+output: html_document
+---
+
+```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(ggcorrplot)
+# Cargar paquetes necesarios
+library(dplyr)
+library(ggpubr)
+library(stats)
+library(gridExtra)
+
+data_raw <- read_csv("../data/Dengue diseases dataset.csv", show_col_types = FALSE)
+
+```
+
+# Limpieza de Datos
+
+```{r}
+#Creación de copia del df original (crudo)
+datos <- data_raw
+names(datos)[9] <- "Dengue Diagnosis"
+#View(data_clean)
+```
+
+```{r}
+# Asegurarse de que la variable de grupo sea factor
+datos$`Dengue Diagnosis` <- as.factor(datos$`Dengue Diagnosis`)
+
+# Variables numéricas a comparar
+variables_numericas <- c("Haemoglobin", "WBC Count", "Platelet Count", "PDW")
+
+
+# Inicializar lista para resultados y gráficos
+resultados <- list()
+graficos <- list()
+```
+
+```{r}
+names(datos)
+
+
+```
+
+
+```{r}
+# Función para analizar cada variable
+for (var in variables_numericas) {
+  
+  grupo0 <- datos %>% filter(`Dengue Diagnosis` == 0) %>% pull(!!sym(var))
+  grupo1 <- datos %>% filter(`Dengue Diagnosis` == 1) %>% pull(!!sym(var))
+  
+  # Pruebas de normalidad
+  norm_0 <- shapiro.test(grupo0)
+  norm_1 <- shapiro.test(grupo1)
+  
+  # Decidir qué prueba usar
+  if (norm_0$p.value > 0.05 && norm_1$p.value > 0.05) {
+    prueba <- t.test(grupo0, grupo1, var.equal = FALSE)
+    metodo <- "t-test (medias)"
+  } else {
+    prueba <- wilcox.test(grupo0, grupo1) # Con esta linea se realizan las pruebas y se obtienen los valores p
+    metodo <- "Mann-Whitney (medianas)"
+  }
+  
+  # Guardar resultado
+  resultados[[var]] <- data.frame(
+    Variable = var,
+    Metodo = metodo,
+    p_valor = round(prueba$p.value, 4),
+    Grupo0_Media = mean(grupo0, na.rm = TRUE),
+    Grupo1_Media = mean(grupo1, na.rm = TRUE)
+  )
+  
+  print(round(prueba$p.value, 4))
+}
+```
+
+```{r}
+# Mostrar resultados
+df_resultados <- do.call(rbind, resultados)
+print(df_resultados)
+
+```
+## ¿Cómo se calcula el estadístico U en la prueba de Mann-Whitney?
+
+Se calcula a partir de la suma de rangos. Existen fórmulas para convertir esa suma a un valor de \( U \), como:
+
+\[
+U = R_1 - \frac{n_1(n_1 + 1)}{2}
+\]
+
+Donde:
+
+- \( R_1 \) es la suma de rangos del grupo 1,
+- \( n_1 \) es el número de observaciones en grupo 1.
+
+---
+
+## Aproximación normal para muestras grandes
+
+Para muestras grandes (como es nuestro caso jsjs), se usa una **aproximación normal** con corrección de continuidad:
+
+\[
+Z = \frac{U - \mu_U}{\sigma_U}
+\]
+
+Donde:
+
+- \( \mu_U = \frac{n_1 n_2}{2} \)
+- \( \sigma_U = \sqrt{ \frac{n_1 n_2 (n_1 + n_2 + 1)}{12} } \)
+
+El **p-valor** se obtiene a partir de esa estadística \( Z \) en la **distribución normal estándar**.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
