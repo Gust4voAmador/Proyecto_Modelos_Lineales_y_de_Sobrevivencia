@@ -1,0 +1,232 @@
+---
+title: "Logistico"
+author: "Gustavo Amador Fonseca C20451"
+date: "2025-06-16"
+output: html_document
+---
+
+```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(ggcorrplot)
+library(dplyr)
+library(ggpubr)
+library(stats)
+library(gridExtra)
+library(pROC)
+library(caret)
+library(ggplot2)
+library(boot)
+library(scorecard)
+
+data_raw <- read_csv("../data/Dengue diseases dataset.csv", show_col_types = FALSE)
+
+```
+
+# Limpieza de Datos
+
+```{r}
+#Creación de copia del df original (crudo)
+datos <- data_raw
+names(datos)[9] <- "Dengue Diagnosis"
+#View(data_clean)
+```
+
+```{r}
+# Asegurar que Dengue sea binaria
+datos$`Dengue Diagnosis` <- as.numeric(as.character(datos$`Dengue Diagnosis`))
+
+# Eliminar la observaciones nulas en Dengue Diagnosis
+datos <- datos[!is.na(datos$`Dengue Diagnosis`),]
+datos
+```
+
+```{r}
+# Variables continuas para transformar con WoE
+vars_continuas <- c("Age", "Haemoglobin", "Platelet Count", "PDW", "WBC Count")
+
+# 1. Crear los bins WoE
+bins <- woebin(dt = datos, y = "Dengue Diagnosis", x = vars_continuas)
+
+# 2. Aplicar WoE a una copia y mantener el orden original
+woe_transformado <- woebin_ply(dt = datos, bins = bins)
+
+# Extraer solo columnas _woe
+woe_solo <- select(woe_transformado, ends_with("_woe"))
+
+# Unir sin perder filas ni columnas
+datos_woe <- bind_cols(datos, woe_solo)
+```
+
+```{r}
+datos_woe
+View(datos_woe)
+```
+
+
+La WBC Count_woe fue colapsada en un solo bin: [-Inf, Inf], esto lo que puede significar es que el algoritmo no encontró forma de dividirla en grupos útiles, seguro porque presenta una correlación lineal con Dengue altísima (0.92)... por lo que no se va a considerar la forma woe en la regresión.
+
+
+```{r}
+# Asegurar que las variables categóricas están como factores
+datos_woe$Sex <- as.factor(datos_woe$Sex)
+datos_woe$`Differential Count` <- as.factor(datos_woe$`Differential Count`)
+datos_woe$`RBC PANEL` <- as.factor(datos_woe$`RBC PANEL`)
+
+# Modelo logístico con todas las variables (originales + transformadas)
+modelo_logit_completo <- glm(`Dengue Diagnosis` ~ 
+                         Age + Age_woe +
+                         Haemoglobin + Haemoglobin_woe +
+                         `Platelet Count` + `Platelet Count_woe` +
+                         PDW + PDW_woe +
+                         `WBC Count` + 
+                         Sex + 
+                         `Differential Count` + 
+                         `RBC PANEL`,
+                       data = datos_woe,
+                       family = binomial)
+
+# Ver el resumen del modelo
+summary(modelo_logit_completo)
+
+# Calcular el BIC
+#BIC(modelo_completo)
+
+```
+Se puede ver que ni la varible Platelet Count se ve estadísticamente importante... por loque quitaré WBC Count que es con la que presenta mayor colinealidad con Platelet y Dengue 
+
+```{r}
+# Ahora quitando las variables woe con valor p de 1, excepto edad_woe
+modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~ 
+                         Age + Age_woe +
+                         Haemoglobin +
+                         `Platelet Count` + `Platelet Count_woe` +
+                         PDW +
+                         #`WBC Count` + 
+                         `Differential Count` + 
+                         `RBC PANEL`,
+                       data = datos_woe,
+                       family = binomial)
+summary(modelo_logit_sin_woe)
+```
+
+```{r, warning=false}
+# Filtrar filas completas (sin NA en variables relevantes)
+variables_modelo <- c("Dengue Diagnosis", 
+                      "Age", "Age_woe", "Haemoglobin", 
+                      "Platelet Count", "Platelet Count_woe", 
+                      "PDW", "Differential Count", "RBC PANEL")
+
+datos_modelo <- datos_woe[complete.cases(datos_woe[, variables_modelo]), ]
+
+# Ajustar nuevamente el modelo sin NA
+modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~ 
+                              Age + Age_woe + Haemoglobin + 
+                              `Platelet Count` + `Platelet Count_woe` + 
+                              PDW + `Differential Count` + `RBC PANEL`,
+                            data = datos_modelo,
+                            family = binomial)
+
+# Aplicar selección automática
+modelo_step <- step(modelo_logit_sin_woe, direction = "both")
+
+# Ver el modelo final
+summary(modelo_step)
+
+```
+```{r}
+# Número de observaciones del modelo
+n_obs <- nrow(model.frame(modelo_logit_sin_woe))
+
+# Búsqueda de modelo óptimo usando BIC
+modelo_step_bic <- step(modelo_logit_sin_woe, direction = "both", k = log(n_obs))
+
+# Ver resumen del modelo final por BIC
+summary(modelo_step_bic)
+
+# Confirmar el BIC del modelo final
+BIC(modelo_step_bic)
+
+```
+Resulta que de las variables... platelet conunt y woe pues en teoría debería reflejar los mismo... por lo que sería bueno quitar la sin woe porque es menos relevante y para que no haya redundancia
+
+
+```{r}
+model_logit_final <- glm(formula = `Dengue Diagnosis` ~ Age_woe + 
+    `Platelet Count_woe`, family = binomial, data = datos_modelo)
+summary(model_logit_final)
+```
+
+
+
+```{r}
+
+
+# Ajustar modelo reducido (si no lo tenés aún)
+modelo_final_AIC <- glm(`Dengue Diagnosis` ~ `Platelet Count` + 
+                     `Differential Count` + 
+    `RBC PANEL`, family = binomial, data = data_clean)
+
+# Probabilidades predichas
+prob <- predict(modelo_final_AIC, type = "response")
+
+# ROC y AUC
+roc_obj <- roc(datos_limpios$`Dengue Diagnosis`, prob)
+plot(roc_obj, col = "blue", main = "Curva ROC - Modelo reducido")
+auc(roc_obj)
+
+```
+
+```{r}
+# Ajustar modelo reducido (si no lo tenés aún)
+modelo_sin_platelet <- glm(`Dengue Diagnosis` ~ #`Platelet Count` + 
+                     `Differential Count` + 
+    `RBC PANEL`, family = binomial, data = data_clean)
+
+# Probabilidades predichas
+prob2 <- predict(modelo_sin_platelet, type = "response")
+
+# ROC y AUC
+roc_obj <- roc(datos_limpios$`Dengue Diagnosis`, prob2)
+plot(roc_obj, col = "blue", main = "Curva ROC - Modelo_sin_platelet")
+auc(roc_obj)
+```
+
+# Métricas
+```{r}
+
+
+# Predicción binaria con umbral 0.5... no estoy seguro cual umbral usar
+pred_binaria <- ifelse(prob > 0.5, 1, 0)
+
+confusionMatrix(as.factor(pred_binaria), as.factor(data_clean$`Dengue Diagnosis`))
+```
+
+```{r}
+
+
+data_clean$prob <- prob
+
+ggplot(datos_limpios, aes(x = `Platelet Count`, y = prob, color = `Dengue Diagnosis`)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE) +
+  labs(title = "Probabilidad predicha vs. recuento de plaquetas",
+       y = "Probabilidad de dengue", x = "Conteo de plaquetas")
+
+```
+
+```{r}
+
+cv <- cv.glm(data_clean, modelo_final_AIC, K = 10)
+cv$delta  # error de validación cruzada
+
+#El segundo resultado supuestamente ajusta el error con un sobreajuste
+#Según help: El ajuste está diseñado para compensar el sesgo introducido por no usar validación cruzada leave-one-out
+```
+
+
+
+
+
+
