@@ -11,9 +11,9 @@ library(dplyr)
 library(ggplot2)
 library(ggcorrplot)
 library(dplyr)
-library(ggpubr)
+#library(ggpubr)
 library(stats)
-library(gridExtra)
+#library(gridExtra)
 library(pROC)
 library(caret)
 library(ggplot2)
@@ -46,22 +46,22 @@ datos
 # Variables continuas para transformar con WoE
 vars_continuas <- c("Age", "Haemoglobin", "Platelet Count", "PDW", "WBC Count")
 
-# 1. Crear los bins WoE
+# Crear los bins WoE
 bins <- woebin(dt = datos, y = "Dengue Diagnosis", x = vars_continuas)
 
-# 2. Aplicar WoE a una copia y mantener el orden original
+# Aplicar WoE a una copia 
 woe_transformado <- woebin_ply(dt = datos, bins = bins)
 
 # Extraer solo columnas _woe
 woe_solo <- select(woe_transformado, ends_with("_woe"))
 
-# Unir sin perder filas ni columnas
+# Unir sin perder 
 datos_woe <- bind_cols(datos, woe_solo)
 ```
 
 ```{r}
 datos_woe
-View(datos_woe)
+#View(datos_woe)
 ```
 
 
@@ -132,7 +132,7 @@ modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~
 modelo_step <- step(modelo_logit_sin_woe, direction = "both")
 
 # Ver el modelo final
-summary(modelo_step)
+#summary(modelo_step)
 
 ```
 ```{r}
@@ -158,40 +158,76 @@ model_logit_final <- glm(formula = `Dengue Diagnosis` ~ Age_woe +
 summary(model_logit_final)
 ```
 
-
+# Ver la capacidad predictiva
 
 ```{r}
 
+set.seed(123)  # Para que sea reproducible
 
-# Ajustar modelo reducido (si no lo tenés aún)
-modelo_final_AIC <- glm(`Dengue Diagnosis` ~ `Platelet Count` + 
-                     `Differential Count` + 
-    `RBC PANEL`, family = binomial, data = data_clean)
+#Partir datos en 70% training y 30% testing
+n <- nrow(datos_modelo)
+idx_train <- sample(1:n, size = 0.7 * n)
 
-# Probabilidades predichas
-prob <- predict(modelo_final_AIC, type = "response")
+train <- datos_modelo[idx_train, ]
+test  <- datos_modelo[-idx_train, ]
 
-# ROC y AUC
-roc_obj <- roc(datos_limpios$`Dengue Diagnosis`, prob)
-plot(roc_obj, col = "blue", main = "Curva ROC - Modelo reducido")
+# Ajustar el modelo solo con el conjunto de training
+modelo_logit_final <- glm(`Dengue Diagnosis` ~ Age_woe + `Platelet Count_woe`,
+                          data = train,
+                          family = binomial)
+
+# Predecir probabilidades en el conjunto de testing
+prob_test <- predict(modelo_logit_final, newdata = test, type = "response")
+
+# Convertir a clases predichas (umbral 0.5) no se si sea lo correcto en este caso
+pred_test <- ifelse(prob_test > 0.5, 1, 0)
+
+# Evaluar con matriz de confusión
+confusionMatrix(as.factor(pred_test), as.factor(test$`Dengue Diagnosis`))
+
+# AUC y curva ROC
+roc_obj <- roc(test$`Dengue Diagnosis`, prob_test)
+plot(roc_obj, col = "blue", main = "Curva ROC - Modelo Final")
 auc(roc_obj)
+
 
 ```
 
-```{r}
-# Ajustar modelo reducido (si no lo tenés aún)
-modelo_sin_platelet <- glm(`Dengue Diagnosis` ~ #`Platelet Count` + 
-                     `Differential Count` + 
-    `RBC PANEL`, family = binomial, data = data_clean)
 
-# Probabilidades predichas
-prob2 <- predict(modelo_sin_platelet, type = "response")
 
-# ROC y AUC
-roc_obj <- roc(datos_limpios$`Dengue Diagnosis`, prob2)
-plot(roc_obj, col = "blue", main = "Curva ROC - Modelo_sin_platelet")
-auc(roc_obj)
-```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Métricas
 ```{r}
@@ -216,14 +252,6 @@ ggplot(datos_limpios, aes(x = `Platelet Count`, y = prob, color = `Dengue Diagno
 
 ```
 
-```{r}
-
-cv <- cv.glm(data_clean, modelo_final_AIC, K = 10)
-cv$delta  # error de validación cruzada
-
-#El segundo resultado supuestamente ajusta el error con un sobreajuste
-#Según help: El ajuste está diseñado para compensar el sesgo introducido por no usar validación cruzada leave-one-out
-```
 
 
 
