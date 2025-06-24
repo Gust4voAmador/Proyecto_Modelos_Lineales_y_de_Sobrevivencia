@@ -106,7 +106,7 @@ summary(modelo_logit_completo)
 ```
 Se puede ver que ni la varible Platelet Count se ve estadísticamente importante... por loque quitaré WBC Count que es con la que presenta mayor colinealidad con Platelet y Dengue 
 
-Ahora ver como ajusta el modelo con estas variables
+Modelo completo con muchas variables (algunas con poca significancia).
 ```{r}
 # Ahora quitando las variables woe con valor p de 1, excepto edad_woe
 modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~ 
@@ -159,6 +159,7 @@ summary(modelo_step_bic)
 
 # Confirmar el BIC del modelo final
 BIC(modelo_step_bic)
+
 
 ```
 Resulta que de las variables... platelet conunt y woe pues en teoría debería reflejar los mismo... por lo que sería bueno quitar la sin woe porque es menos relevante y para que no haya redundancia
