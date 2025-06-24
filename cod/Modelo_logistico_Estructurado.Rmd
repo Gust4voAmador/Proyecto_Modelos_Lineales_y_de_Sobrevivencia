@@ -3,8 +3,8 @@ title: "Logistico"
 author: "Gustavo Amador Fonseca C20451"
 date: "2025-06-16"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
@@ -26,6 +26,8 @@ data_raw <- read_csv("../data/Dengue diseases dataset.csv", show_col_types = FAL
 
 ```
 
+# 1. Limpieza de datos
+
 # Limpieza de Datos
 
 ```{r}
@@ -44,6 +46,8 @@ datos$`Dengue Diagnosis` <- as.numeric(as.character(datos$`Dengue Diagnosis`))
 datos <- datos[!is.na(datos$`Dengue Diagnosis`),]
 datos
 ```
+
+# 2. Transformación WoE
 
 ```{r}
 # Variables continuas para transformar con WoE
@@ -67,17 +71,15 @@ datos_woe
 #View(datos_woe)
 ```
 
-
 La WBC Count_woe fue colapsada en un solo bin: [-Inf, Inf], esto lo que puede significar es que el algoritmo no encontró forma de dividirla en grupos útiles, seguro porque presenta una correlación lineal con Dengue altísima (0.92)... por lo que no se va a considerar la forma woe en la regresión.
-
 
 ```{r}
 print(sum(datos$`Dengue Diagnosis` == 1))
 print(sum(datos$`Dengue Diagnosis` == 0))
 ```
 
+## Explorar ajuste del modelo logistico con todas las variables
 
-Tantear BIC con todas las variables pero al parecer no sirvió de nada 
 ```{r}
 # Asegurar que las variables categóricas están como factores
 datos_woe$Sex <- as.factor(datos_woe$Sex)
@@ -100,13 +102,12 @@ modelo_logit_completo <- glm(`Dengue Diagnosis` ~
 # Ver el resumen del modelo
 summary(modelo_logit_completo)
 
-# Calcular el BIC
-#BIC(modelo_completo)
-
 ```
-Se puede ver que ni la varible Platelet Count se ve estadísticamente importante... por loque quitaré WBC Count que es con la que presenta mayor colinealidad con Platelet y Dengue 
 
-Ahora ver como ajusta el modelo con estas variables
+Se puede ver que ni la varible Platelet Count se ve estadísticamente importante... por loque quitaré WBC Count que es con la que presenta mayor colinealidad con Platelet y Dengue
+
+## Segundo ajuste eliminando variables
+
 ```{r}
 # Ahora quitando las variables woe con valor p de 1, excepto edad_woe
 modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~ 
@@ -121,7 +122,11 @@ modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~
                        family = binomial)
 summary(modelo_logit_sin_woe)
 ```
-Analizar el aporte de estas variables con el S
+
+En este ajuste se puede ver que ya la variable Platelet Count_woe se muestra altamente significativa, entonces es necesario hacer selección de variables
+
+### Selección de variables anteriores con BIC
+
 ```{r, results='markup', echo=TRUE, message=FALSE, warning=FALSE}
 
 # Filtrar filas completas (sin NA en variables relevantes)
@@ -140,45 +145,67 @@ modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~
                             data = datos_modelo,
                             family = binomial)
 
-# Aplicar selección automática
-modelo_step <- step(modelo_logit_sin_woe, direction = "both")
+# Aplicar selección automática con BIC
+modelo_step_bic <- step(modelo_logit_sin_woe, direction = "both", k = log(nrow(datos_modelo)))
 
-# Ver el modelo final
-summary(modelo_step)
-
-```
-```{r}
-# Número de observaciones del modelo
-n_obs <- nrow(model.frame(modelo_logit_sin_woe))
-
-# Búsqueda de modelo óptimo usando BIC
-modelo_step_bic <- step(modelo_logit_sin_woe, direction = "both", k = log(n_obs))
-
-# Ver resumen del modelo final por BIC
+# Ver resumen del modelo final
 summary(modelo_step_bic)
 
-# Confirmar el BIC del modelo final
-BIC(modelo_step_bic)
-
 ```
-Resulta que de las variables... platelet conunt y woe pues en teoría debería reflejar los mismo... por lo que sería bueno quitar la sin woe porque es menos relevante y para que no haya redundancia
 
+Resulta que de las variables... platelet conunt y woe pues en teoría debería reflejar los mismo teniendo alta colinealidad... por lo que sería bueno quitar la sin woe porque es menos relevante y para que no haya redundancia.
+
+# 4. Modelo logístico final y resumen
 
 ```{r}
 model_logit_final <- glm(formula = `Dengue Diagnosis` ~ Age_woe + 
     `Platelet Count_woe`, family = binomial, data = datos_modelo)
+
 summary(model_logit_final)
 ```
 
 # Ver la capacidad predictiva
-1- Validación cruzada estratificada 10-fold
 
-2- Ajusta un modelo logístico con edad_woe y platelet_count_woe
+## Validación cruzada cláisca con 5 pliegues
+```{r, warning=FALSE}
+set.seed(187)
 
-3- Calcula AUC, sensibilidad y especificidad promedios
+# Asegurar que la variable respuesta es un factor con clase positiva definida
+datos_modelo$DengueFactor <- factor(
+  ifelse(datos_modelo$`Dengue Diagnosis` == 1, "Sí", "No"),
+  levels = c("No", "Sí")
+)
+
+# Control de validación cruzada clásica (5 folds)
+ctrl <- trainControl(
+  method = "cv",           # Validación cruzada clásica
+  number = 5,              # 5 pliegues
+  classProbs = TRUE,       # Necesario para calcular AUC
+  summaryFunction = twoClassSummary,
+  savePredictions = "final"
+)
+
+# Entrenar modelo con validación cruzada
+modelo_cv_clasico <- train(
+  DengueFactor ~ Age_woe + `Platelet Count_woe`,
+  data = datos_modelo,
+  method = "glm",
+  metric = "ROC",          # Optimiza AUC
+  trControl = ctrl
+)
+
+# Mostrar resultados de la validación cruzada
+print(modelo_cv_clasico)
+
+# Promedio de AUC en los 5 folds
+mean(modelo_cv_clasico$resample$ROC)
+
+```
+Detecta correctamente el 97.7% de los casos Sí
+Nota correctamente el 99.5% de los No
 
 
-# CV estratifada sin balanceo
+## CV estratifada sin balanceo
 ```{r cv-estratificada, message=FALSE, warning=FALSE}
 
 set.seed(187)
@@ -229,6 +256,9 @@ for (p in train_props) {
                     predictor = pred_test$Sí,
                     levels = c("No", "Sí"))$auc
     
+
+# 5. Validación cruzada estratificada (sin balancear)
+
     # Guardar resultado
     resultados_estratificados <- rbind(resultados_estratificados,
                                        data.frame(TamanoEntrenamiento = round(p * 100),
@@ -244,6 +274,9 @@ for (p in train_props) {
 ```
 
 ```{r}
+
+## 5.1 Resultados promedio AUC por tamaño de entrenamiento
+
 # Mostrar tabla final
 print(resultados_estratificados)
 resumen_estratificados <- aggregate(AUC_Test ~ TamanoEntrenamiento, data = resultados_estratificados, FUN = mean)
@@ -251,9 +284,9 @@ print(resumen_estratificados)
 
 ```
 
+## Balanceo artificial de las clases con upSample
 
-# Balanceo artificial de las clases con upSample
-```{r}
+```{r cv-estratificada, message=FALSE, warning=FALSE}
 
 set.seed(187)
 
@@ -316,6 +349,9 @@ for (p in train_props) {
                     predictor = pred_test$Sí,
                     levels = c("No", "Sí"))$auc
     
+
+# 5. Validación cruzada estratificada (sin balancear)
+
     # Guardar resultados
     resultados_balanceados <- rbind(resultados_balanceados,
                         data.frame(TamanoEntrenamiento = round(p * 100),
@@ -327,81 +363,93 @@ for (p in train_props) {
   }
 }
 
+
+```
+
+```{r}
+## 6.1 Resultados promedio AUC balanceado
+
 # Mostrar tablas
 print(resultados_balanceados)
 resumen_balanceados <- aggregate(AUC_Test ~ TamanoEntrenamiento, data = resultados_balanceados, FUN = mean)
 print(resumen_balanceados)
+```
+En general se puede notar que el BALANCEADO da peroes (mínimos) resultados de ajuste de AUC, por que el balanceo no evidencia alguana mejora significativa.
+
+Considerar que:
+El sobremuestreo (overfitting) puede hacer que algunas observaciones se repitan mucho. Si querés ser más riguroso, podés usar más repeticiones o comparar con métodos como SMOTE.
+
+
+# Validación cruzada repetida (30% de trainig)
+
+```{r, warning=FALSE}
+set.seed(187)
+
+# Variable de clase como factor binario
+datos_modelo$DengueFactor <- factor(
+  ifelse(datos_modelo$`Dengue Diagnosis` == 1, "Sí", "No"),
+  levels = c("No", "Sí")
+)
+
+# Repeticiones
+reps <- 30
+porcentaje_entrenamiento <- 0.3
+
+# Almacenar resultados
+metricas <- data.frame()
+
+for (i in 1:reps) {
+  
+  # 1. Partición estratificada (30% para entrenar)
+  idx_train <- createDataPartition(datos_modelo$DengueFactor, p = porcentaje_entrenamiento, list = FALSE)
+  train_data <- datos_modelo[idx_train, ]
+  test_data <- datos_modelo[-idx_train, ]
+  
+  # 2. Control de validación cruzada estratificada
+  ctrl <- trainControl(
+    method = "cv",
+    number = 5,
+    classProbs = TRUE,
+    summaryFunction = twoClassSummary,
+    savePredictions = "final"
+  )
+  
+  # 3. Modelo
+  modelo <- train(
+    DengueFactor ~ Age_woe + `Platelet Count_woe`,
+    data = train_data,
+    method = "glm",
+    metric = "ROC",
+    trControl = ctrl
+  )
+  
+  # 4. Predicción sobre test externo
+  pred_probs <- predict(modelo, newdata = test_data, type = "prob")
+  pred_clase <- predict(modelo, newdata = test_data)
+  
+  # 5. AUC
+  auc <- roc(response = test_data$DengueFactor,
+             predictor = pred_probs$Sí,
+             levels = c("No", "Sí"))$auc
+  
+  # 6. Matriz de confusión y métricas
+  cm <- confusionMatrix(pred_clase, test_data$DengueFactor, positive = "Sí")
+  
+  metricas <- rbind(metricas, data.frame(
+    Repeticion = i,
+    AUC = auc,
+    Accuracy = cm$overall["Accuracy"],
+    Sensibilidad = cm$byClass["Sensitivity"],
+    Especificidad = cm$byClass["Specificity"],
+    F1 = cm$byClass["F1"],
+    Precision = cm$byClass["Precision"]
+  ))
+}
+
+# Ver resumen
+print(summary(metricas))
 
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
