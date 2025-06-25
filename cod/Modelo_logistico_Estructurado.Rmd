@@ -47,7 +47,10 @@ datos <- datos[!is.na(datos$`Dengue Diagnosis`),]
 datos
 ```
 
-# 2. Transformación WoE
+# 2. Ajuste de modelo con varibles crudas (sin transformaciones)
+Como se hizo en el otro .Rmd de modelo logístico
+
+# 3. Transformación WoE
 
 ```{r}
 # Variables continuas para transformar con WoE
@@ -108,6 +111,7 @@ Se puede ver que ni la varible Platelet Count se ve estadísticamente importante
 
 ## Segundo ajuste eliminando variables
 
+### Con variable Platelet Count y Platelet Count_woe
 ```{r}
 # Ahora quitando las variables woe con valor p de 1, excepto edad_woe
 modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~ 
@@ -122,11 +126,26 @@ modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~
                        family = binomial)
 summary(modelo_logit_sin_woe)
 ```
+### Con variable WBC Count
 
-En este ajuste se puede ver que ya la variable Platelet Count_woe se muestra altamente significativa, entonces es necesario hacer selección de variables
+```{r}
+# Ahora quitando las variables woe con valor p de 1, excepto edad_woe
+modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~ 
+                         Age + Age_woe +
+                         Haemoglobin +
+                        #`Platelet Count` + `Platelet Count_woe` +
+                         PDW +
+                         `WBC Count` + 
+                         `Differential Count` + 
+                         `RBC PANEL`,
+                       data = datos_woe,
+                       family = binomial)
+summary(modelo_logit_sin_woe)
+```
+En este ajuste se puede ver que ya la variable Platelet Count_woe se muestra altamente significativa, mientras que la otra varieable con con la que Dengue Diagnosis tenía alta colinealidad no se muestra poco significativa en comparación, entonces se decide continuar con las variables Platelet Count y Platelet Count_woe, ahora es necesario hacer selección de variables
 
 ### Selección de variables anteriores con BIC
-
+Considera las variablaes del ajuste logístico anterior y hace la selección BIC para escogencia de variables
 ```{r, results='markup', echo=TRUE, message=FALSE, warning=FALSE}
 
 # Filtrar filas completas (sin NA en variables relevantes)
@@ -137,7 +156,7 @@ variables_modelo <- c("Dengue Diagnosis",
 
 datos_modelo <- datos_woe[complete.cases(datos_woe[, variables_modelo]), ]
 
-# Ajustar nuevamente el modelo sin NA
+# Ajustar el modelo (recordar que no considera los NA)
 modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~ 
                               Age + Age_woe + Haemoglobin + 
                               `Platelet Count` + `Platelet Count_woe` + 
@@ -145,18 +164,20 @@ modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~
                             data = datos_modelo,
                             family = binomial)
 
-# Aplicar selección automática con BIC
+# Selección con BIC
 modelo_step_bic <- step(modelo_logit_sin_woe, direction = "both", k = log(nrow(datos_modelo)))
 
-# Ver resumen del modelo final
+
 summary(modelo_step_bic)
 
 ```
 
-Resulta que de las variables... platelet conunt y woe pues en teoría debería reflejar los mismo teniendo alta colinealidad... por lo que sería bueno quitar la sin woe porque es menos relevante y para que no haya redundancia.
+En el modelo ajustado se observa que tanto Platelet Count como su transformación Platelet Count_woe resultan estadísticamente significativas. Sin embargo, dado que ambas variables capturan esencialmente la misma información, ya que una es directamente y la otra mediante codificación WoE, es razonable suponer que existe una alta colinealidad entre ellas.
+
+La inclusión simultánea de estas dos variables podría generar redundancia en el modelo y dificultar la interpretación de los coeficientes. Además, podría afectar negativamente la estabilidad del modelo y su capacidad predictiva si se traslada a nuevos datos. Por ello, es mejor eliminar la variable Platelet Count, dado que la variable Platelet Count_woe ofrece una mejor representación con la variable respuesta.
 
 # 4. Modelo logístico final y resumen
-
+Se considera como modelo logistico final el que solo utiliza la variables predictoras de Age_woe y Platelet Count_woe
 ```{r}
 model_logit_final <- glm(formula = `Dengue Diagnosis` ~ Age_woe + 
     `Platelet Count_woe`, family = binomial, data = datos_modelo)
@@ -166,11 +187,20 @@ summary(model_logit_final)
 
 # Ver la capacidad predictiva
 
-## Validación cruzada cláisca con 5 pliegues
+## Ver capacidad predictiva con variables no ajustadas (con platelet count y WBC Count)
+
+Ver con solo platelet counto y con WBC count la capacidad predictiva de las variables no transformadas.
+
+
+## Ver capacidad predictiva con variables transformadas
+
+### Validación cruzada cláisca con 5 pliegues
+Primeramente una validación cruzada simple y clásico de cinco pliegues para evaluar la capacidad predictiva del modelo logistico final.
+
 ```{r, warning=FALSE}
 set.seed(187)
 
-# Asegurar que la variable respuesta es un factor con clase positiva definida
+# la variable debe respuesta es un factor con clase positiva definida
 datos_modelo$DengueFactor <- factor(
   ifelse(datos_modelo$`Dengue Diagnosis` == 1, "Sí", "No"),
   levels = c("No", "Sí")
@@ -178,34 +208,32 @@ datos_modelo$DengueFactor <- factor(
 
 # Control de validación cruzada clásica (5 folds)
 ctrl <- trainControl(
-  method = "cv",           # Validación cruzada clásica
-  number = 5,              # 5 pliegues
-  classProbs = TRUE,       # Necesario para calcular AUC
+  method = "cv",           
+  number = 5,              
+  classProbs = TRUE,       
   summaryFunction = twoClassSummary,
   savePredictions = "final"
 )
 
-# Entrenar modelo con validación cruzada
+# Entrenar modelo 
 modelo_cv_clasico <- train(
   DengueFactor ~ Age_woe + `Platelet Count_woe`,
   data = datos_modelo,
   method = "glm",
-  metric = "ROC",          # Optimiza AUC
+  metric = "ROC",          
   trControl = ctrl
 )
 
-# Mostrar resultados de la validación cruzada
 print(modelo_cv_clasico)
 
 # Promedio de AUC en los 5 folds
 mean(modelo_cv_clasico$resample$ROC)
 
 ```
-Detecta correctamente el 97.7% de los casos Sí
-Nota correctamente el 99.5% de los No
+La validación cruzada de 5 pliegues del modelo logístico final mostró un excelente desempeño predictivo, con un AUC promedio de 0.9922. El modelo identifica correctamente el 97.7% de los casos positivos (sensibilidad) y clasifica adecuadamente el 99.5% de los casos negativos (especificidad), lo que indica una alta capacidad de discriminación y confiabilidad para predecir el diagnóstico de dengue.
 
 
-## CV estratifada sin balanceo
+### CV estratifada sin balanceo 
 ```{r cv-estratificada, message=FALSE, warning=FALSE}
 
 set.seed(187)
@@ -216,20 +244,20 @@ datos_modelo$DengueFactor <- factor(
   levels = c("No", "Sí")
 )
 
-# Proporciones del conjunto de entrenamiento
+# Conjuntos de entrenamiento
 train_props <- c(0.7, 0.5, 0.3, 0.1)
 
-# Repeticiones por proporción
+# Repeticiones por proporción de conjunto de training
 reps <- 10
 
-# Control de entrenamiento con validación cruzada
+# validación cruzada
 ctrl <- trainControl(
   method = "cv",
   number = 5,
   classProbs = TRUE
 )
 
-# Inicializar resultados
+# Inicializar para guardar resultados
 resultados_estratificados <- data.frame()
 
 for (p in train_props) {
@@ -255,34 +283,26 @@ for (p in train_props) {
     auc_test <- roc(response = datos_test$DengueFactor,
                     predictor = pred_test$Sí,
                     levels = c("No", "Sí"))$auc
-    
-
-# 5. Validación cruzada estratificada (sin balancear)
 
     # Guardar resultado
     resultados_estratificados <- rbind(resultados_estratificados,
                                        data.frame(TamanoEntrenamiento = round(p * 100),
                                                   Repeticion = i,
                                                   AUC_Test = auc_test))
-    
-    #message("ENTRENAMIENTO estratificado con ", round(p * 100), "% de datos | Repetición ", i,
-    #    ": AUC en TEST = ", round(auc_test, 4))
   }
 }
 
 
 ```
-
 ```{r}
-
-## 5.1 Resultados promedio AUC por tamaño de entrenamiento
-
-# Mostrar tabla final
+# Ver resultados
 print(resultados_estratificados)
 resumen_estratificados <- aggregate(AUC_Test ~ TamanoEntrenamiento, data = resultados_estratificados, FUN = mean)
 print(resumen_estratificados)
 
 ```
+Se evaluó el modelo logístico utilizando validación cruzada estratificada con diferentes tamaños de conjunto de entrenamiento (10%, 30%, 50% y 70%), repitiendo el proceso 10 veces por proporción. Los resultados muestran una alta estabilidad y capacidad predictiva del modelo, con valores promedio de AUC superiores a 0.99 en todos los casos. El mejor desempeño se obtuvo con el 50% de los datos de entrenamiento (AUC promedio = 0.9945), lo que confirma que incluso con muestras relativamente pequeñas, el modelo logra distinguir eficazmente entre casos positivos y negativos de dengue.
+
 
 ## Balanceo artificial de las clases con upSample
 
@@ -296,13 +316,11 @@ datos_modelo$DengueFactor <- factor(
   levels = c("No", "Sí")
 )
 
-# Proporciones del conjunto de entrenamiento
 train_props <- c(0.7, 0.5, 0.3, 0.1)
 
-# Repeticiones por proporción
 reps <- 10
 
-# Control de entrenamiento con validación cruzada
+# Control validación cruzada
 ctrl <- trainControl(
   method = "cv",
   number = 5,
@@ -311,7 +329,7 @@ ctrl <- trainControl(
   savePredictions = "final"
 )
 
-# Inicializar resultados
+# Inicializar 
 resultados_balanceados <- data.frame()
 
 for (p in train_props) {
@@ -329,9 +347,6 @@ for (p in train_props) {
       yname = "DengueFactor"
     )
     
-    # Verificar balance (opcional)
-    # print(table(datos_train_balanceado$DengueFactor))
-    
     # Entrenar modelo logístico
     modelo <- train(
       DengueFactor ~ Age_woe + `Platelet Count_woe`,
@@ -348,18 +363,12 @@ for (p in train_props) {
     auc_test <- roc(response = datos_test$DengueFactor,
                     predictor = pred_test$Sí,
                     levels = c("No", "Sí"))$auc
-    
-
-# 5. Validación cruzada estratificada (sin balancear)
 
     # Guardar resultados
     resultados_balanceados <- rbind(resultados_balanceados,
                         data.frame(TamanoEntrenamiento = round(p * 100),
                                    Repeticion = i,
                                    AUC_Test = auc_test))
-    
-    #message("✅ Entrenamiento balanceado con", round(p * 100), "% de datos | Repetición", i,
-    #    ": AUC en TEST =", round(auc_test, 4), "\n")
   }
 }
 
@@ -367,18 +376,15 @@ for (p in train_props) {
 ```
 
 ```{r}
-## 6.1 Resultados promedio AUC balanceado
-
-# Mostrar tablas
+# Mostrar tablas resultados
 print(resultados_balanceados)
 resumen_balanceados <- aggregate(AUC_Test ~ TamanoEntrenamiento, data = resultados_balanceados, FUN = mean)
 print(resumen_balanceados)
 ```
-En general se puede notar que el BALANCEADO da peroes (mínimos) resultados de ajuste de AUC, por que el balanceo no evidencia alguana mejora significativa.
+El balanceo artificial mediante sobremuestreo no mejora significativamente el desempeño del modelo. En algunos casos incluso reduce ligeramente el AUC. Esto se debe a que las variables transformadas (Age_woe y Platelet Count_woe) ya ajustan tan bien al modelo que los cambios en el tamaño de entrenamiento o el balanceo no generan diferencias sustanciales en la capacidad predictiva.
 
 Considerar que:
-El sobremuestreo (overfitting) puede hacer que algunas observaciones se repitan mucho. Si querés ser más riguroso, podés usar más repeticiones o comparar con métodos como SMOTE.
-
+El sobremuestreo (overfitting) puede hacer que algunas observaciones se repitan mucho.
 
 # Validación cruzada repetida (30% de trainig)
 
@@ -391,8 +397,8 @@ datos_modelo$DengueFactor <- factor(
   levels = c("No", "Sí")
 )
 
-# Repeticiones
-reps <- 30
+# Repeticiones de la validación
+reps <- 100
 porcentaje_entrenamiento <- 0.3
 
 # Almacenar resultados
@@ -400,12 +406,12 @@ metricas <- data.frame()
 
 for (i in 1:reps) {
   
-  # 1. Partición estratificada (30% para entrenar)
+  #Partición estratificada (30% para training)
   idx_train <- createDataPartition(datos_modelo$DengueFactor, p = porcentaje_entrenamiento, list = FALSE)
   train_data <- datos_modelo[idx_train, ]
   test_data <- datos_modelo[-idx_train, ]
   
-  # 2. Control de validación cruzada estratificada
+  #Control de validación cruzada estratificada
   ctrl <- trainControl(
     method = "cv",
     number = 5,
@@ -414,7 +420,7 @@ for (i in 1:reps) {
     savePredictions = "final"
   )
   
-  # 3. Modelo
+  # Ajuste de modelo
   modelo <- train(
     DengueFactor ~ Age_woe + `Platelet Count_woe`,
     data = train_data,
@@ -423,16 +429,16 @@ for (i in 1:reps) {
     trControl = ctrl
   )
   
-  # 4. Predicción sobre test externo
+  #Predicción sobre test externo
   pred_probs <- predict(modelo, newdata = test_data, type = "prob")
   pred_clase <- predict(modelo, newdata = test_data)
   
-  # 5. AUC
+  #AUC
   auc <- roc(response = test_data$DengueFactor,
              predictor = pred_probs$Sí,
              levels = c("No", "Sí"))$auc
   
-  # 6. Matriz de confusión y métricas
+  #Matriz de confusión y métricas
   cm <- confusionMatrix(pred_clase, test_data$DengueFactor, positive = "Sí")
   
   metricas <- rbind(metricas, data.frame(
@@ -450,7 +456,9 @@ for (i in 1:reps) {
 print(summary(metricas))
 
 ```
+El modelo logístico validado con 100 repeticiones usando solo el 30% de los datos para entrenamiento mantiene un rendimiento sobresaliente. Se obtuvo un AUC promedio de 0.9929, con exactitud media del 98.96%, sensibilidad del 99.51% y especificidad del 97.80%.
 
+Este desempeño se debe a que las variables transformadas Age_woe y Platelet Count_woe reflejan de forma muy clara el diagnóstico de dengue. Más que mejorar el modelo, los cambios en técnicas de muestreo o balanceo tienen poco efecto, porque estas variables ya capturan de manera directa y efectiva la señal del fenómeno.
 
 
 
