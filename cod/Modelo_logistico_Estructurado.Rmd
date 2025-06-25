@@ -382,7 +382,7 @@ El sobremuestreo (overfitting) puede hacer que algunas observaciones se repitan 
 
 # Validación cruzada repetida (30% de trainig)
 
-```{r, warning=FALSE}
+```{r, warning=FALSE, message=FALSE}
 set.seed(187)
 
 # Variable de clase como factor binario
