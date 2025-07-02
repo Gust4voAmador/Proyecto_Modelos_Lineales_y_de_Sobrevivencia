@@ -13,9 +13,7 @@ library(dplyr)
 library(ggplot2)
 library(ggcorrplot)
 library(dplyr)
-#library(ggpubr)
 library(stats)
-#library(gridExtra)
 library(pROC)
 library(caret)
 library(ggplot2)
@@ -48,6 +46,7 @@ datos
 ```
 
 # 2. Ajuste de modelo con varibles crudas (sin transformaciones)
+
 Como se hizo en el otro .Rmd de modelo logístico
 
 # 3. Transformación WoE
@@ -112,6 +111,7 @@ Se puede ver que ni la varible Platelet Count se ve estadísticamente importante
 ## Segundo ajuste eliminando variables
 
 ### Con variable Platelet Count y Platelet Count_woe
+
 ```{r}
 # Ahora quitando las variables woe con valor p de 1, excepto edad_woe
 modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~ 
@@ -126,6 +126,7 @@ modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~
                        family = binomial)
 summary(modelo_logit_sin_woe)
 ```
+
 ### Con variable WBC Count
 
 ```{r}
@@ -142,10 +143,13 @@ modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~
                        family = binomial)
 summary(modelo_logit_sin_woe)
 ```
+
 En este ajuste se puede ver que ya la variable Platelet Count_woe se muestra altamente significativa, mientras que la otra varieable con con la que Dengue Diagnosis tenía alta colinealidad no se muestra poco significativa en comparación, entonces se decide continuar con las variables Platelet Count y Platelet Count_woe, ahora es necesario hacer selección de variables
 
 ### Selección de variables anteriores con BIC
+
 Considera las variablaes del ajuste logístico anterior y hace la selección BIC para escogencia de variables
+
 ```{r, results='markup', echo=TRUE, message=FALSE, warning=FALSE}
 
 # Filtrar filas completas (sin NA en variables relevantes)
@@ -177,7 +181,9 @@ En el modelo ajustado se observa que tanto Platelet Count como su transformació
 La inclusión simultánea de estas dos variables podría generar redundancia en el modelo y dificultar la interpretación de los coeficientes. Además, podría afectar negativamente la estabilidad del modelo y su capacidad predictiva si se traslada a nuevos datos. Por ello, es mejor eliminar la variable Platelet Count, dado que la variable Platelet Count_woe ofrece una mejor representación con la variable respuesta.
 
 # 4. Modelo logístico final y resumen
+
 Se considera como modelo logistico final el que solo utiliza la variables predictoras de Age_woe y Platelet Count_woe
+
 ```{r}
 model_logit_final <- glm(formula = `Dengue Diagnosis` ~ Age_woe + 
     `Platelet Count_woe`, family = binomial, data = datos_modelo)
@@ -191,10 +197,10 @@ summary(model_logit_final)
 
 Ver con solo platelet counto y con WBC count la capacidad predictiva de las variables no transformadas.
 
-
 ## Ver capacidad predictiva con variables transformadas
 
 ### Validación cruzada cláisca con 5 pliegues
+
 Primeramente una validación cruzada simple y clásico de cinco pliegues para evaluar la capacidad predictiva del modelo logistico final.
 
 ```{r, warning=FALSE}
@@ -230,10 +236,11 @@ print(modelo_cv_clasico)
 mean(modelo_cv_clasico$resample$ROC)
 
 ```
+
 La validación cruzada de 5 pliegues del modelo logístico final mostró un excelente desempeño predictivo, con un AUC promedio de 0.9922. El modelo identifica correctamente el 97.7% de los casos positivos (sensibilidad) y clasifica adecuadamente el 99.5% de los casos negativos (especificidad), lo que indica una alta capacidad de discriminación y confiabilidad para predecir el diagnóstico de dengue.
 
+### CV estratifada sin balanceo
 
-### CV estratifada sin balanceo 
 ```{r cv-estratificada, message=FALSE, warning=FALSE}
 
 set.seed(187)
@@ -294,6 +301,7 @@ for (p in train_props) {
 
 
 ```
+
 ```{r}
 # Ver resultados
 print(resultados_estratificados)
@@ -301,8 +309,8 @@ resumen_estratificados <- aggregate(AUC_Test ~ TamanoEntrenamiento, data = resul
 print(resumen_estratificados)
 
 ```
-Se evaluó el modelo logístico utilizando validación cruzada estratificada con diferentes tamaños de conjunto de entrenamiento (10%, 30%, 50% y 70%), repitiendo el proceso 10 veces por proporción. Los resultados muestran una alta estabilidad y capacidad predictiva del modelo, con valores promedio de AUC superiores a 0.99 en todos los casos. El mejor desempeño se obtuvo con el 50% de los datos de entrenamiento (AUC promedio = 0.9945), lo que confirma que incluso con muestras relativamente pequeñas, el modelo logra distinguir eficazmente entre casos positivos y negativos de dengue.
 
+Se evaluó el modelo logístico utilizando validación cruzada estratificada con diferentes tamaños de conjunto de entrenamiento (10%, 30%, 50% y 70%), repitiendo el proceso 10 veces por proporción. Los resultados muestran una alta estabilidad y capacidad predictiva del modelo, con valores promedio de AUC superiores a 0.99 en todos los casos. El mejor desempeño se obtuvo con el 50% de los datos de entrenamiento (AUC promedio = 0.9945), lo que confirma que incluso con muestras relativamente pequeñas, el modelo logra distinguir eficazmente entre casos positivos y negativos de dengue.
 
 ## Balanceo artificial de las clases con upSample
 
@@ -381,10 +389,10 @@ print(resultados_balanceados)
 resumen_balanceados <- aggregate(AUC_Test ~ TamanoEntrenamiento, data = resultados_balanceados, FUN = mean)
 print(resumen_balanceados)
 ```
+
 El balanceo artificial mediante sobremuestreo no mejora significativamente el desempeño del modelo. En algunos casos incluso reduce ligeramente el AUC. Esto se debe a que las variables transformadas (Age_woe y Platelet Count_woe) ya ajustan tan bien al modelo que los cambios en el tamaño de entrenamiento o el balanceo no generan diferencias sustanciales en la capacidad predictiva.
 
-Considerar que:
-El sobremuestreo (overfitting) puede hacer que algunas observaciones se repitan mucho.
+Considerar que: El sobremuestreo (overfitting) puede hacer que algunas observaciones se repitan mucho.
 
 # Validación cruzada repetida (30% de trainig)
 
@@ -456,9 +464,7 @@ for (i in 1:reps) {
 print(summary(metricas))
 
 ```
+
 El modelo logístico validado con 100 repeticiones usando solo el 30% de los datos para entrenamiento mantiene un rendimiento sobresaliente. Se obtuvo un AUC promedio de 0.9929, con exactitud media del 98.96%, sensibilidad del 99.51% y especificidad del 97.80%.
 
 Este desempeño se debe a que las variables transformadas Age_woe y Platelet Count_woe reflejan de forma muy clara el diagnóstico de dengue. Más que mejorar el modelo, los cambios en técnicas de muestreo o balanceo tienen poco efecto, porque estas variables ya capturan de manera directa y efectiva la señal del fenómeno.
-
-
-
