@@ -34,20 +34,81 @@ datos <- data_raw
 names(datos)[9] <- "Dengue Diagnosis"
 # Asegurar que Dengue sea binaria
 datos$`Dengue Diagnosis` <- as.numeric(as.character(datos$`Dengue Diagnosis`))
-#View(data_clean)
+#View(datos)
 ```
 
+Se están eliminando las observaciones con datos faltantes
 ```{r}
 
-
-# Eliminar la observaciones nulas en Dengue Diagnosis
-datos <- datos[!is.na(datos$`Dengue Diagnosis`),]
+# Filtrar observaciones con datos completos en todas las variables potenciales del scope
+datos <- datos %>%
+  select(`Dengue Diagnosis`, Age, Haemoglobin, PDW, `WBC Count`, 
+         `Differential Count`, `RBC PANEL`, `Platelet Count` ) %>%
+  na.omit()
 datos
 ```
 
 # 2. Ajuste de modelo con varibles crudas (sin transformaciones)
 
-Como se hizo en el otro .Rmd de modelo logístico
+## Conjunto de variables con Platelet Count
+
+### Validación cruzada cláisca con 5 pliegues
+
+Primeramente una validación cruzada simple y clásico de cinco pliegues para evaluar la capacidad predictiva del modelo logistico final.
+
+```{r, warning=FALSE}
+set.seed(187)
+
+# Crear la variable de clase en el dataset correcto
+datos$DengueFactor <- factor(
+  ifelse(datos$`Dengue Diagnosis` == 1, "Sí", "No"),
+  levels = c("No", "Sí")
+)
+
+# Eliminar NAs si existen en las columnas relevantes
+datos_filtrado <- datos %>%
+  select(DengueFactor, `Platelet Count`) %>%
+  na.omit()
+
+# Control para validación cruzada
+ctrl <- trainControl(
+  method = "cv",           
+  number = 5,              
+  classProbs = TRUE,       
+  summaryFunction = twoClassSummary,
+  savePredictions = "final"
+)
+
+# Entrenar el modelo con Platelet Count (sin WoE)
+modelo_cv_clasico_plat <- train(
+  DengueFactor ~ `Platelet Count`,
+  data = datos_filtrado,
+  method = "glm",
+  metric = "ROC",          
+  trControl = ctrl
+)
+
+print(modelo_cv_clasico_plat)
+
+# AUC promedio en 5 folds
+mean(modelo_cv_clasico_plat$resample$ROC)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # 3. Transformación WoE
 
@@ -192,10 +253,6 @@ summary(model_logit_final)
 ```
 
 # Ver la capacidad predictiva
-
-## Ver capacidad predictiva con variables no ajustadas (con platelet count y WBC Count)
-
-Ver con solo platelet counto y con WBC count la capacidad predictiva de las variables no transformadas.
 
 ## Ver capacidad predictiva con variables transformadas
 
