@@ -796,6 +796,34 @@ odds de tener dengue disminuyen aproximadamente 0.014%, lo que también
 indica que a menor conteo plaquetario, mayor probabilidad de dengue.</p>
 </div>
 </div>
+<div id="comparación-de-modelos-mejores-modelos-por-conjunto" class="section level1">
+<h1>Comparación de modelos mejores modelos por conjunto</h1>
+<p>Como parte del cumplimiento del segundo objetivo del análisis, se
+compararon dos modelos logísticos reducidos obtenidos mediante selección
+hacia atrás utilizando el criterio BIC. Ambos modelos fueron construidos
+con base en subconjuntos de variables altamente correlacionadas (WBC
+Count y Platelet Count), las cuales no se incluyeron simultáneamente
+para evitar problemas de colinealidad.</p>
+<p>El primer modelo consideró únicamente la variable WBC Count como
+predictor del diagnóstico de dengue. Esta variable resultó
+estadísticamente significativa (p = 0.0299) y presentó un coeficiente
+negativo, lo que indica que a mayor recuento de glóbulos blancos,
+disminuye la probabilidad de diagnóstico positivo. El modelo mostró un
+excelente ajuste, con un AIC de 15.83 y una deviance residual de 11.83,
+lo que sugiere que esta variable por sí sola capta gran parte de la
+señal predictiva del diagnóstico.</p>
+<p>El segundo modelo incluyó exclusivamente la variable Platelet Count,
+también con un coeficiente negativo altamente significativo (p &lt;
+0.0001), lo cual es consistente con la trombocitopenia observada en
+pacientes con dengue. Sin embargo, su ajuste fue considerablemente
+inferior en comparación con el modelo anterior, presentando un AIC de
+150.86 y una deviance residual de 137.18.</p>
+<p>Aunque ambos modelos son coherentes desde el punto de vista clínico y
+estadístico, el modelo basado en WBC Count ofreció un mejor desempeño
+global en términos de parsimonia y capacidad explicativa. Por lo tanto,
+se concluye que, dentro del conjunto de datos analizado, WBC Count
+constituye el mejor predictor individual del diagnóstico de dengue.</p>
+</div>
 
 
 
