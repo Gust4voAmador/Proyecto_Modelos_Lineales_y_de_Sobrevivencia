@@ -1,0 +1,177 @@
+---
+title: "Testeo de variables"
+output: html_document
+date: "2025-07-06"
+---
+
+```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(ggcorrplot)
+library(dplyr)
+library(stats)
+library(pROC)
+library(caret)
+library(ggplot2)
+library(boot)
+library(scorecard)
+
+data_raw <- read_csv("../data/Dengue diseases dataset.csv", show_col_types = FALSE)
+
+```
+
+# 1. Limpieza de datos
+
+# Limpieza de Datos
+
+```{r}
+#Creación de copia del df original (crudo)
+datos <- data_raw
+names(datos)[9] <- "Dengue Diagnosis"
+# Asegurar que Dengue sea binaria
+datos$`Dengue Diagnosis` <- as.numeric(as.character(datos$`Dengue Diagnosis`))
+#View(datos)
+```
+
+Se están eliminando las observaciones con datos faltantes
+```{r}
+
+# Filtrar observaciones con datos completos en todas las variables potenciales del scope
+datos <- datos %>%
+  select(`Dengue Diagnosis`, Age, Haemoglobin, PDW, `WBC Count`, 
+         `Differential Count`, `RBC PANEL`, `Platelet Count` ) %>%
+  na.omit()
+datos
+```
+Se puede apreciar que una vez eliminadas las observaciones con datos faltantes se conservó el 92,82% de la data original, por lo que no se ha eliminado una cantidad significativas de datos que puedan alterar la información que aporta la base de datos.
+
+
+# Selección de conjuntos de variables
+
+## Ajuste logistico del modelo completo 
+```{r}
+# Modelo logístico con todas las variables (originales + transformadas)
+modelo_logit_completo <- glm(`Dengue Diagnosis` ~ 
+                         Age + Haemoglobin + `Platelet Count` + PDW 
+                         +`WBC Count` 
+                         + `Differential Count` + `RBC PANEL`,
+                         data = datos,
+                         family = binomial)
+
+# Ver el resumen del modelo
+summary(modelo_logit_completo)
+```
+Al ajustar un modelo logístico completo con todas las variables hematológicas simultáneamente, se observó un comportamiento inestable y advertencias durante la estimación. Esto puede deberse a la alta colinealidad entre algunas variables, especialmente entre WBC Count y Platelet Count, que presentan una correlación de 0.75. 
+
+Este tipo de colinealidad dificulta que el modelo distinga adecuadamente la contribución individual de cada predictor, lo que puede afectar la convergencia del algoritmo y la interpretación de los coeficientes. Por ello, se consideró más adecuado analizar subconjuntos de variables para mejorar la estabilidad del modelo y facilitar la interpretación.
+Entonces se decide hacer dos conjuntos de variables, uno completo sin WBC Count y otro sin Platelet Count.
+
+# Modelo completo sin Platelet Count
+
+```{r, warning=FALSE}
+# Ajustar el modelo completo con los datos ya filtrados
+modelo_wbc_count <- glm(`Dengue Diagnosis` ~ 
+                          Age + Haemoglobin + PDW + `WBC Count` + 
+                          `Differential Count` + `RBC PANEL`,
+                        data = datos, family = binomial)
+
+print(summary(modelo_wbc_count))
+
+
+```
+
+## Ejecutar step() desde el modelo completo sin Platelet Count, hacia el más simple, usando BIC
+```{r, warning=FALSE}
+# Ejecutar step() desde el modelo completo, hacia el más simple, usando BIC
+modelo_step_wbc <- step(modelo_wbc_count,
+                        scope = list(
+                          upper = ~ Age + Haemoglobin + PDW + `WBC Count` + 
+                                     `Differential Count` + `RBC PANEL`,
+                          lower = ~ 1),
+                        direction = "both",
+                        k = log(nrow(datos)))
+
+# Ver resultados finales
+summary(modelo_step_wbc)
+```
+A través del procedimiento de selección hacia atrás usando el criterio BIC, se identificó que la variable WBC Count por sí sola proporciona el mejor ajuste parsimonioso al modelo logístico para el diagnóstico de dengue. Todas las demás variables fueron descartadas progresivamente por no mejorar la penalización del BIC. Además, WBC Count resultó estadísticamente significativa (p = 0.0299), con un coeficiente negativo, lo que respalda la evidencia clínica de que pacientes con dengue suelen presentar leucopenia. Esto sugiere que esta variable por sí sola capta gran parte de la señal predictiva del diagnóstico.
+
+En un modelo logístico, los coeficientes representan el cambio en el logit asociado con un cambio de una unidad en la variable predictora. Por lo tanto, cada aumento de 1 unidad en WBC Count, las odds de tener dengue se reducen en aproximadamente un 1.11%. Para este caso como no hay más covariables no hay problemas de colinealidad que dificulte la interpretabilidad.
+
+
+
+
+# Modelo completo sin WBC Count
+
+```{r, warning=FALSE}
+# Ajustar el modelo completo con los datos ya filtrados
+modelo_platelet_count <- glm(`Dengue Diagnosis` ~ 
+                          Age + Haemoglobin + PDW + `Platelet Count` + 
+                          `Differential Count` + `RBC PANEL`,
+                        data = datos, family = binomial)
+
+print(summary(modelo_platelet_count))
+
+
+```
+
+Se pueden identificar que Platelet Count (p < 2e-16) es significativa y Age es marginalmente significativa (p ≈ 0.029). Las demás variables no se muestran estadísticamente significativas.
+
+Los errores estándar excesivos en Differential Count y RBC PANEL sugieren que no están contribuyendo al modelo y podrían estar generando inestabilidad.
+
+Por ende, aunque el modelo se ajusta bien (AIC = 139.49), hay evidencia de redundancia y variables innecesarias, lo que justifica aplicar selección de variables.
+
+
+```{r, warning=FALSE}
+# Ejecutar step() desde el modelo completo, hacia el más simple, usando BIC
+modelo_step_platelet <- step(modelo_platelet_count,
+                        scope = list(
+                          upper = ~ Age + Haemoglobin + PDW + `Platelet Count` + 
+                                     `Differential Count` + `RBC PANEL`,
+                          lower = ~ 1),
+                        direction = "both",
+                        k = log(nrow(datos)))
+
+# Ver resultados finales
+summary(modelo_step_platelet)
+```
+
+A través del procedimiento de selección hacia atrás usando el criterio BIC, se identificó que la variable Platelet Count por sí sola proporciona el mejor ajuste parsimonioso al modelo logístico para el diagnóstico de dengue, cuando no se considera WBC Count. Todas las demás variables fueron descartadas progresivamente por no mejorar la penalización del BIC. Además, Platelet Count resultó altamente significativa (p < 0.0001), con un coeficiente negativo, lo que concuerda con la evidencia clínica de que los pacientes con dengue suelen presentar trombocitopenia. Esto sugiere que esta variable por sí sola también capta una parte importante de la señal predictiva del diagnóstico.
+
+En un modelo logístico, los coeficientes representan el cambio en el logit asociado con un cambio de una unidad en la variable predictora. Por lo tanto, cada aumento de 1 unidad en Platelet Count, las odds de tener dengue se reducen en aproximadamente un 0.015%. Al no haber otras covariables, no hay problemas de colinealidad que afecten la interpretación.
+
+
+## Considerando variable edad
+Dado que el modelo completo sin WBC Count mostraba que la varibale Age tambien era significativa, se decide ajusta con la variables significativas, además el el procedimiento de selección acia atrás fue la ultima variable en quitarse, por lo que justifica su análisis.
+
+```{r}
+pepe2 <- glm(`Dengue Diagnosis` ~ 
+                          Age + `Platelet Count`,
+                        data = datos, family = binomial)
+
+print(summary(pepe2))
+```
+
+El modelo Age + Platelet Count es más parsimonioso y mejor ajustado que el modelo completo, y explica la variabilidad en los datos sin necesidad de incluir covariables que no contribuyen significativamente
+
+Interpretando coeficientes se tiene que: 
+Cada año adicional de edad se asocia con una reducción en las odds de diagnóstico de dengue de aproximadamente 2.6%.
+Por cada unidad adicional en Platelet Count, las odds de tener dengue disminuyen aproximadamente 0.014%, lo que también indica que a menor conteo plaquetario, mayor probabilidad de dengue.
+
+ 
+# Comparación de modelos mejores modelos por conjunto
+
+Como parte del cumplimiento del segundo objetivo del análisis, se compararon dos modelos logísticos reducidos obtenidos mediante selección hacia atrás utilizando el criterio BIC. Ambos modelos fueron construidos con base en subconjuntos de variables altamente correlacionadas (WBC Count y Platelet Count), las cuales no se incluyeron simultáneamente para evitar problemas de colinealidad.
+
+El primer modelo consideró únicamente la variable WBC Count como predictor del diagnóstico de dengue. Esta variable resultó estadísticamente significativa (p = 0.0299) y presentó un coeficiente negativo, lo que indica que a mayor recuento de glóbulos blancos, disminuye la probabilidad de diagnóstico positivo. El modelo mostró un excelente ajuste, con un AIC de 15.83 y una deviance residual de 11.83, lo que sugiere que esta variable por sí sola capta gran parte de la señal predictiva del diagnóstico.
+
+El segundo modelo incluyó exclusivamente la variable Platelet Count, también con un coeficiente negativo altamente significativo (p < 0.0001), lo cual es consistente con la trombocitopenia observada en pacientes con dengue. Sin embargo, su ajuste fue considerablemente inferior en comparación con el modelo anterior, presentando un AIC de 150.86 y una deviance residual de 137.18.
+
+Aunque ambos modelos son coherentes desde el punto de vista clínico y estadístico, el modelo basado en WBC Count ofreció un mejor desempeño global en términos de parsimonia y capacidad explicativa. Por lo tanto, se concluye que, dentro del conjunto de datos analizado, WBC Count constituye el mejor predictor individual del diagnóstico de dengue.
+
+
+
+
+
+
