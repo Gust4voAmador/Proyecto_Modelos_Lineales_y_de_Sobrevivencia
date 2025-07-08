@@ -1,0 +1,393 @@
+---
+title: "segundo intento"
+author: "Gustavo Amador Fonseca C20451"
+date: "2025-07-07"
+output: html_document
+---
+
+```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(ggcorrplot)
+library(dplyr)
+library(stats)
+library(pROC)
+library(caret)
+library(ggplot2)
+library(boot)
+library(scorecard)
+
+data_raw <- read_csv("../data/Dengue diseases dataset.csv", show_col_types = FALSE)
+
+```
+
+# 1. Limpieza de datos
+
+# Limpieza de Datos
+
+```{r}
+#Creación de copia del df original (crudo)
+datos <- data_raw
+names(datos)[9] <- "Dengue Diagnosis"
+# Asegurar que Dengue sea binaria
+datos$`Dengue Diagnosis` <- as.numeric(as.character(datos$`Dengue Diagnosis`))
+#View(datos)
+```
+
+Se están eliminando las observaciones con datos faltantes
+```{r}
+
+# Filtrar observaciones con datos completos en todas las variables potenciales del scope
+datos <- datos %>%
+  select(`Dengue Diagnosis`, Age, Haemoglobin, PDW, `WBC Count`, 
+         `Differential Count`, `RBC PANEL`, `Platelet Count` ) %>%
+  na.omit()
+datos
+```
+
+# 2. Ajuste de modelo con varibles crudas (sin transformaciones)
+
+## Conjunto de variables con Platelet Count
+
+### Validación cruzada cláisca con 5 pliegues
+
+Primeramente una validación cruzada simple y clásico de cinco pliegues para evaluar la capacidad predictiva del modelo logistico final.
+
+```{r, warning=FALSE}
+set.seed(187)
+
+# Crear la variable de clase en el dataset correcto
+datos$DengueFactor <- factor(
+  ifelse(datos$`Dengue Diagnosis` == 1, "Sí", "No"),
+  levels = c("No", "Sí")
+)
+
+# Eliminar NAs si existen en las columnas relevantes
+datos_filtrado <- datos %>%
+  select(DengueFactor, `Platelet Count`) %>%
+  na.omit()
+
+# Control para validación cruzada
+ctrl <- trainControl(
+  method = "cv",           
+  number = 5,              
+  classProbs = TRUE,       
+  summaryFunction = twoClassSummary,
+  savePredictions = "final"
+)
+
+# Entrenar el modelo con Platelet Count (sin WoE)
+modelo_cv_clasico_plat <- train(
+  DengueFactor ~ `Platelet Count`,
+  data = datos_filtrado,
+  method = "glm",
+  metric = "ROC",          
+  trControl = ctrl
+)
+
+print(modelo_cv_clasico_plat)
+
+# AUC promedio en 5 folds
+mean(modelo_cv_clasico_plat$resample$ROC)
+
+
+```
+
+La validación cruzada clásica de 5 pliegues utilizando únicamente la variable Platelet Count mostró un excelente desempeño predictivo. El modelo alcanzó un AUC promedio de 0.9945, con una sensibilidad de 98.67% y una especificidad de 98.58%, lo cual indica una alta capacidad para distinguir correctamente entre pacientes con y sin diagnóstico de dengue usando solo esta variable hematológica.
+
+### Validación cruzada estratificada sin balanceo
+
+```{r, warning=FALSE, message=FALSE}
+
+set.seed(187)
+
+# Crear variable binaria
+datos$DengueFactor <- factor(
+  ifelse(datos$`Dengue Diagnosis` == 1, "Sí", "No"),
+  levels = c("No", "Sí")
+)
+
+# Filtrar columnas necesarias y eliminar NA
+datos_filtrado <- datos %>%
+  select(DengueFactor, `Platelet Count`) %>%
+  na.omit()
+
+# Proporciones del conjunto de entrenamiento
+train_props <- c(0.7, 0.5, 0.3, 0.1)
+reps <- 10
+
+# Control de validación cruzada
+ctrl <- trainControl(
+  method = "cv",
+  number = 5,
+  classProbs = TRUE
+)
+
+# Guardar resultados
+resultados_estratificados <- data.frame()
+
+for (p in train_props) {
+  for (i in 1:reps) {
+    idx_train <- createDataPartition(datos_filtrado$DengueFactor, p = p, list = FALSE)
+    datos_train <- datos_filtrado[idx_train, ]
+    datos_test <- datos_filtrado[-idx_train, ]
+    
+    modelo <- train(
+      DengueFactor ~ `Platelet Count`,
+      data = datos_train,
+      method = "glm",
+      trControl = ctrl,
+      metric = "ROC"
+    )
+    
+    pred_test <- predict(modelo, newdata = datos_test, type = "prob")
+    
+    auc_test <- roc(response = datos_test$DengueFactor,
+                    predictor = pred_test$Sí,
+                    levels = c("No", "Sí"))$auc
+    
+    resultados_estratificados <- rbind(resultados_estratificados,
+      data.frame(
+        TamanoEntrenamiento = round(p * 100),
+        Repeticion = i,
+        AUC_Test = auc_test
+      )
+    )
+  }
+}
+
+# Ver resultados
+print(resultados_estratificados)
+resumen_estratificados <- aggregate(AUC_Test ~ TamanoEntrenamiento, data = resultados_estratificados, FUN = mean)
+print(resumen_estratificados)
+```
+
+La validación cruzada estratificada sin balanceo, realizada con diferentes proporciones del conjunto de entrenamiento (10%, 30%, 50% y 70%), mostró que el modelo logístico basado únicamente en Platelet Count mantiene un desempeño predictivo sobresaliente en todos los escenarios. Los valores promedio de AUC oscilaron entre 0.9932 y 0.9959, alcanzando su mejor rendimiento con un 70% del conjunto dedicado al entrenamiento. Esto indica que incluso con tamaños de muestra relativamente pequeños, el modelo logra discriminar eficazmente entre casos positivos y negativos de dengue.
+
+
+### Validación cruzada repetida con Platelet Count (30% training)
+
+```{r, warning=FALSE, , message=FALSE}
+
+
+set.seed(187)
+
+# Definir variable binaria en el dataset correcto
+datos$DengueFactor <- factor(
+  ifelse(datos$`Dengue Diagnosis` == 1, "Sí", "No"),
+  levels = c("No", "Sí")
+)
+
+# Filtrar columnas necesarias y eliminar NA
+datos_filtrado <- datos %>%
+  select(DengueFactor, `Platelet Count`) %>%
+  na.omit()
+
+# Repeticiones
+reps <- 100
+porcentaje_entrenamiento <- 0.3
+
+# Inicializar almacenamiento
+metricas <- data.frame()
+
+for (i in 1:reps) {
+  # Partición estratificada (30% para entrenamiento)
+  idx_train <- createDataPartition(datos_filtrado$DengueFactor, p = porcentaje_entrenamiento, list = FALSE)
+  train_data <- datos_filtrado[idx_train, ]
+  test_data <- datos_filtrado[-idx_train, ]
+  
+  # Control de CV estratificada
+  ctrl <- trainControl(
+    method = "cv",
+    number = 5,
+    classProbs = TRUE,
+    summaryFunction = twoClassSummary,
+    savePredictions = "final"
+  )
+  
+  # Ajuste de modelo logístico
+  modelo <- train(
+    DengueFactor ~ `Platelet Count`,
+    data = train_data,
+    method = "glm",
+    metric = "ROC",
+    trControl = ctrl
+  )
+  
+  # Predicción en conjunto de prueba
+  pred_probs <- predict(modelo, newdata = test_data, type = "prob")
+  pred_clase <- predict(modelo, newdata = test_data)
+  
+  # Calcular AUC y métricas
+  auc <- roc(response = test_data$DengueFactor,
+             predictor = pred_probs$Sí,
+             levels = c("No", "Sí"))$auc
+  
+  cm <- confusionMatrix(pred_clase, test_data$DengueFactor, positive = "Sí")
+  
+  metricas <- rbind(metricas, data.frame(
+    Repeticion = i,
+    AUC = auc,
+    Accuracy = cm$overall["Accuracy"],
+    Sensibilidad = cm$byClass["Sensitivity"],
+    Especificidad = cm$byClass["Specificity"],
+    F1 = cm$byClass["F1"],
+    Precision = cm$byClass["Precision"]
+  ))
+}
+
+# Mostrar resumen de métricas
+summary(metricas)
+```
+
+La validación cruzada repetida, realizada con 100 iteraciones utilizando solo el 30% del conjunto de datos para entrenamiento y Platelet Count como única variable predictora, evidenció un rendimiento predictivo excepcional. El modelo obtuvo un AUC promedio de 0.9938, con una exactitud media de 98.70%, sensibilidad de 98.88% y especificidad de 98.32%. Además, las métricas F1 y precisión fueron igualmente altas, lo que confirma la estabilidad y efectividad del modelo, incluso con una proporción limitada de datos para el aprendizaje. Estos resultados respaldan la capacidad de Platelet Count para discriminar adecuadamente entre pacientes con y sin diagnóstico de dengue.
+
+
+## Conjunto de variables con WBC Count
+
+### Validación cruzada cláisca con 5 pliegues
+
+```{r, warning=FALSE}
+set.seed(187)
+
+# Crear la variable de clase como factor binario
+datos$DengueFactor <- factor(
+  ifelse(datos$`Dengue Diagnosis` == 1, "Sí", "No"),
+  levels = c("No", "Sí")
+)
+
+# Filtrar columnas necesarias y eliminar NA
+datos_filtrado <- datos %>%
+  select(DengueFactor, `WBC Count`) %>%
+  na.omit()
+
+# Control para validación cruzada
+ctrl <- trainControl(
+  method = "cv",           
+  number = 5,              
+  classProbs = TRUE,       
+  summaryFunction = twoClassSummary,
+  savePredictions = "final"
+)
+
+# Entrenar el modelo con WBC Count como predictor
+modelo_cv_clasico_wbc <- train(
+  DengueFactor ~ `WBC Count`,
+  data = datos_filtrado,
+  method = "glm",
+  metric = "ROC",          
+  trControl = ctrl
+)
+
+# Imprimir resultados
+print(modelo_cv_clasico_wbc)
+
+# AUC promedio en los 5 folds
+mean(modelo_cv_clasico_wbc$resample$ROC)
+```
+
+### Validación cruzada repetida con WBC Count (30% training)
+
+```{r, warning=FALSE, , message=FALSE}
+set.seed(187)
+
+# Definir variable binaria
+datos$DengueFactor <- factor(
+  ifelse(datos$`Dengue Diagnosis` == 1, "Sí", "No"),
+  levels = c("No", "Sí")
+)
+
+# Filtrar columnas necesarias y eliminar NA
+datos_filtrado <- datos %>%
+  select(DengueFactor, `WBC Count`) %>%
+  na.omit()
+
+# Repeticiones
+reps <- 100
+porcentaje_entrenamiento <- 0.3
+
+# Inicializar almacenamiento
+metricas <- data.frame()
+
+for (i in 1:reps) {
+  # Partición estratificada (30% para entrenamiento)
+  idx_train <- createDataPartition(datos_filtrado$DengueFactor, p = porcentaje_entrenamiento, list = FALSE)
+  train_data <- datos_filtrado[idx_train, ]
+  test_data <- datos_filtrado[-idx_train, ]
+  
+  # Control de CV estratificada
+  ctrl <- trainControl(
+    method = "cv",
+    number = 5,
+    classProbs = TRUE,
+    summaryFunction = twoClassSummary,
+    savePredictions = "final"
+  )
+  
+  # Ajuste del modelo
+  modelo <- train(
+    DengueFactor ~ `WBC Count`,
+    data = train_data,
+    method = "glm",
+    metric = "ROC",
+    trControl = ctrl
+  )
+  
+  # Predicción
+  pred_probs <- predict(modelo, newdata = test_data, type = "prob")
+  pred_clase <- predict(modelo, newdata = test_data)
+  
+  # AUC
+  auc <- roc(response = test_data$DengueFactor,
+             predictor = pred_probs[,"Sí"],
+             levels = c("No", "Sí"))$auc
+  
+  # Matriz de confusión y métricas
+  cm <- confusionMatrix(pred_clase, test_data$DengueFactor, positive = "Sí")
+  
+  metricas <- rbind(metricas, data.frame(
+    Repeticion = i,
+    AUC = auc,
+    Accuracy = cm$overall["Accuracy"],
+    Sensibilidad = cm$byClass["Sensitivity"],
+    Especificidad = cm$byClass["Specificity"],
+    F1 = cm$byClass["F1"],
+    Precision = cm$byClass["Precision"]
+  ))
+}
+
+# Ver resumen
+summary(metricas)
+```
+
+
+# 3. Transformación WoE
+
+```{r, message=FALSE}
+# Variables continuas para transformar con WoE
+vars_continuas <- c("Age", "Haemoglobin", "Platelet Count", "PDW", "WBC Count")
+
+# Crear los bins WoE
+bins <- woebin(dt = datos, y = "Dengue Diagnosis", x = vars_continuas)
+
+# Aplicar WoE a una copia 
+woe_transformado <- woebin_ply(dt = datos, bins = bins)
+
+# Extraer solo columnas _woe
+woe_solo <- select(woe_transformado, ends_with("_woe"))
+
+# Unir sin perder 
+datos_woe <- bind_cols(datos, woe_solo)
+```
+
+```{r}
+datos_woe
+#View(datos_woe)
+```
+
+
+
+
+
+

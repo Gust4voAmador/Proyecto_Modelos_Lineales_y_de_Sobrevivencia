@@ -1,0 +1,74 @@
+---
+title: "Crea_df_woe"
+author: "Gustavo Amador Fonseca C20451"
+date: "2025-07-07"
+output: html_document
+---
+
+```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(ggcorrplot)
+library(dplyr)
+library(stats)
+library(pROC)
+library(caret)
+library(ggplot2)
+library(boot)
+library(scorecard)
+
+data_raw <- read_csv("../data/Dengue diseases dataset.csv", show_col_types = FALSE)
+
+```
+
+# 1. Limpieza de datos
+
+# Limpieza de Datos
+
+```{r}
+#Creación de copia del df original (crudo)
+datos <- data_raw
+names(datos)[9] <- "Dengue Diagnosis"
+# Asegurar que Dengue sea binaria
+datos$`Dengue Diagnosis` <- as.numeric(as.character(datos$`Dengue Diagnosis`))
+#View(datos)
+```
+
+Se están eliminando las observaciones con datos faltantes
+```{r}
+
+# Filtrar observaciones con datos completos en todas las variables potenciales del scope
+datos <- datos %>%
+  select(`Dengue Diagnosis`, Age, Haemoglobin, PDW, `WBC Count`, 
+         `Differential Count`, `RBC PANEL`, `Platelet Count` ) %>%
+  na.omit()
+datos
+```
+
+
+# 3. Transformación WoE
+
+```{r, message=FALSE}
+# Variables continuas para transformar con WoE
+vars_continuas <- c("Age", "Haemoglobin", "Platelet Count", "PDW", "WBC Count")
+
+# Crear los bins WoE
+bins <- woebin(dt = datos, y = "Dengue Diagnosis", x = vars_continuas)
+
+# Aplicar WoE a una copia 
+woe_transformado <- woebin_ply(dt = datos, bins = bins)
+
+# Extraer solo columnas _woe
+woe_solo <- select(woe_transformado, ends_with("_woe"))
+
+# Unir sin perder 
+datos_woe <- bind_cols(datos, woe_solo)
+```
+```{r}
+# Guardar el conjunto de datos transformado con WoE en la carpeta ../data
+write.csv(datos_woe, "../data/datos_woe.csv", row.names = FALSE)
+```
+
+
+

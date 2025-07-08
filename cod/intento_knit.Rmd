@@ -1,10 +1,8 @@
 ---
-title: "Logistico"
+title: "Untitled"
 author: "Gustavo Amador Fonseca C20451"
-date: "2025-06-16"
-output:
-  html_document: default
-  pdf_document: default
+date: "2025-07-07"
+output: html_document
 ---
 
 ```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
@@ -95,11 +93,12 @@ mean(modelo_cv_clasico_plat$resample$ROC)
 
 
 ```
+
 La validación cruzada clásica de 5 pliegues utilizando únicamente la variable Platelet Count mostró un excelente desempeño predictivo. El modelo alcanzó un AUC promedio de 0.9945, con una sensibilidad de 98.67% y una especificidad de 98.58%, lo cual indica una alta capacidad para distinguir correctamente entre pacientes con y sin diagnóstico de dengue usando solo esta variable hematológica.
 
 ### Validación cruzada estratificada sin balanceo
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 
 set.seed(187)
 
@@ -163,6 +162,7 @@ print(resultados_estratificados)
 resumen_estratificados <- aggregate(AUC_Test ~ TamanoEntrenamiento, data = resultados_estratificados, FUN = mean)
 print(resumen_estratificados)
 ```
+
 La validación cruzada estratificada sin balanceo, realizada con diferentes proporciones del conjunto de entrenamiento (10%, 30%, 50% y 70%), mostró que el modelo logístico basado únicamente en Platelet Count mantiene un desempeño predictivo sobresaliente en todos los escenarios. Los valores promedio de AUC oscilaron entre 0.9932 y 0.9959, alcanzando su mejor rendimiento con un 70% del conjunto dedicado al entrenamiento. Esto indica que incluso con tamaños de muestra relativamente pequeños, el modelo logra discriminar eficazmente entre casos positivos y negativos de dengue.
 
 
@@ -240,6 +240,7 @@ for (i in 1:reps) {
 # Mostrar resumen de métricas
 summary(metricas)
 ```
+
 La validación cruzada repetida, realizada con 100 iteraciones utilizando solo el 30% del conjunto de datos para entrenamiento y Platelet Count como única variable predictora, evidenció un rendimiento predictivo excepcional. El modelo obtuvo un AUC promedio de 0.9938, con una exactitud media de 98.70%, sensibilidad de 98.88% y especificidad de 98.32%. Además, las métricas F1 y precisión fueron igualmente altas, lo que confirma la estabilidad y efectividad del modelo, incluso con una proporción limitada de datos para el aprendizaje. Estos resultados respaldan la capacidad de Platelet Count para discriminar adecuadamente entre pacientes con y sin diagnóstico de dengue.
 
 
@@ -286,9 +287,9 @@ print(modelo_cv_clasico_wbc)
 mean(modelo_cv_clasico_wbc$resample$ROC)
 ```
 
-# Validación cruzada estratificada sin balanceo
+### Validación cruzada estratificada sin balanceo WBC Count
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 
 set.seed(187)
 
@@ -333,9 +334,8 @@ for (p in train_props) {
     
     pred_test <- predict(modelo, newdata = datos_test, type = "prob")
     
-    # Asegurar que la columna para clase positiva se llama "Sí"
     auc_test <- roc(response = datos_test$DengueFactor,
-                    predictor = pred_test[,"Sí"],
+                    predictor = pred_test$Sí,
                     levels = c("No", "Sí"))$auc
     
     resultados_estratificados <- rbind(resultados_estratificados,
@@ -352,10 +352,7 @@ for (p in train_props) {
 print(resultados_estratificados)
 resumen_estratificados <- aggregate(AUC_Test ~ TamanoEntrenamiento, data = resultados_estratificados, FUN = mean)
 print(resumen_estratificados)
-
-
 ```
-
 
 ### Validación cruzada repetida con WBC Count (30% training)
 
@@ -432,27 +429,10 @@ summary(metricas)
 ```
 
 
-
-
-
-
 # 3. Transformación WoE
 
-```{r}
-# Variables continuas para transformar con WoE
-vars_continuas <- c("Age", "Haemoglobin", "Platelet Count", "PDW", "WBC Count")
-
-# Crear los bins WoE
-bins <- woebin(dt = datos, y = "Dengue Diagnosis", x = vars_continuas)
-
-# Aplicar WoE a una copia 
-woe_transformado <- woebin_ply(dt = datos, bins = bins)
-
-# Extraer solo columnas _woe
-woe_solo <- select(woe_transformado, ends_with("_woe"))
-
-# Unir sin perder 
-datos_woe <- bind_cols(datos, woe_solo)
+```{r, message=FALSE}
+datos_woe <- read_csv("C:/Users/AMADOR/OneDrive - Universidad de Costa Rica/I-2025/Modelos lineales y de sobrevivencia/Proyecto Modelos/data/datos_woe.csv")
 ```
 
 ```{r}
@@ -462,14 +442,9 @@ datos_woe
 
 La WBC Count_woe fue colapsada en un solo bin: [-Inf, Inf], esto lo que puede significar es que el algoritmo no encontró forma de dividirla en grupos útiles, seguro porque presenta una correlación lineal con Dengue altísima (0.92)... por lo que no se va a considerar la forma woe en la regresión.
 
-```{r}
-print(sum(datos$`Dengue Diagnosis` == 1))
-print(sum(datos$`Dengue Diagnosis` == 0))
-```
-
 ## Explorar ajuste del modelo logistico con todas las variables
 
-```{r}
+```{r, warning=FALSE}
 # Asegurar que las variables categóricas están como factores
 datos_woe$`Differential Count` <- as.factor(datos_woe$`Differential Count`)
 datos_woe$`RBC PANEL` <- as.factor(datos_woe$`RBC PANEL`)
@@ -493,6 +468,43 @@ summary(modelo_logit_completo)
 
 Se puede ver que ni la varible Platelet Count se ve estadísticamente importante... por loque quitaré WBC Count que es con la que presenta mayor colinealidad con Platelet y Dengue
 
+Metira: ahora dejaré a WBC Counto porque fue la que presentó menor BIC, al contrario de Platelet count
+
+
+### Selección de variables a partir del modelo completo con BIC
+
+Considera las variablaes del ajuste logístico anterior y hace la selección BIC para escogencia de variables
+
+```{r, results='markup', echo=TRUE, message=FALSE, warning=FALSE}
+
+# Filtrar filas completas (sin NA en variables relevantes)
+variables_modelo <- c("Dengue Diagnosis", 
+                      "Age", "Age_woe", "Haemoglobin", 
+                      "Platelet Count", "Platelet Count_woe", 
+                      "PDW", "Differential Count", "RBC PANEL")
+
+datos_modelo <- datos_woe[complete.cases(datos_woe[, variables_modelo]), ]
+
+# Ajustar el modelo (recordar que no considera los NA)
+modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~ 
+                              Age + Age_woe + Haemoglobin + 
+                              `Platelet Count` + `Platelet Count_woe` + `WBC Count`+ 
+                              PDW + `Differential Count` + `RBC PANEL`,
+                            data = datos_modelo,
+                            family = binomial)
+
+# Selección con BIC
+modelo_step_bic <- step(modelo_logit_sin_woe, direction = "both", k = log(nrow(datos_modelo)))
+
+
+summary(modelo_step_bic)
+
+```
+Se puede ver que llegó a las variables más importantes... pero estas al estar tan correlacionadas no muestran una significancia
+estadísticamente considerable, lo que dificulta la interpretación de sus coeficientes y del moedelo en genera, por lo que se descarta
+a pesar de tener un AIC bajo.
+
+
 ## Segundo ajuste eliminando variables
 
 ### Con variable Platelet Count y Platelet Count_woe
@@ -511,10 +523,29 @@ modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~
                        family = binomial)
 summary(modelo_logit_sin_woe)
 ```
-
-
-
 En este ajuste se puede ver que ya la variable Platelet Count_woe se muestra altamente significativa, mientras que la otra varieable con con la que Dengue Diagnosis tenía alta colinealidad no se muestra poco significativa en comparación, entonces se decide continuar con las variables Platelet Count y Platelet Count_woe, ahora es necesario hacer selección de variables
+
+
+### Con variable WBC Count
+
+```{r}
+# Ahora quitando las variables woe con valor p de 1, excepto edad_woe
+modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~ 
+                         Age + Age_woe +
+                         Haemoglobin +
+                        #`Platelet Count` + `Platelet Count_woe` +
+                         PDW +
+                         `WBC Count` + 
+                         `Differential Count` + 
+                         `RBC PANEL`,
+                       data = datos_woe,
+                       family = binomial)
+summary(modelo_logit_sin_woe)
+```
+Tiene un mejor ajuste global penalizado, pero solo una variable significativa marginalmente.
+
+Preferí modelo con variables significativas, como el A, aunque el BIC sea mayor. Así ase interpreta mejor el efecto de cada variable.
+
 
 ### Selección de variables anteriores con BIC
 
@@ -546,6 +577,7 @@ summary(modelo_step_bic)
 
 ```
 
+
 En el modelo ajustado se observa que tanto Platelet Count como su transformación Platelet Count_woe resultan estadísticamente significativas. Sin embargo, dado que ambas variables capturan esencialmente la misma información, ya que una es directamente y la otra mediante codificación WoE, es razonable suponer que existe una alta colinealidad entre ellas.
 
 La inclusión simultánea de estas dos variables podría generar redundancia en el modelo y dificultar la interpretación de los coeficientes. Además, podría afectar negativamente la estabilidad del modelo y su capacidad predictiva si se traslada a nuevos datos. Por ello, es mejor eliminar la variable Platelet Count, dado que la variable Platelet Count_woe ofrece una mejor representación con la variable respuesta.
@@ -560,6 +592,7 @@ model_logit_final <- glm(formula = `Dengue Diagnosis` ~ Age_woe +
 
 summary(model_logit_final)
 ```
+
 
 # Ver la capacidad predictiva
 
@@ -682,7 +715,7 @@ Se evaluó el modelo logístico utilizando validación cruzada estratificada con
 
 ## Balanceo artificial de las clases con upSample
 
-```{r cv-estratificada, message=FALSE, warning=FALSE}
+```{r resultados-balanceados, message=FALSE, warning=FALSE}
 
 set.seed(187)
 
@@ -836,3 +869,5 @@ print(summary(metricas))
 El modelo logístico validado con 100 repeticiones usando solo el 30% de los datos para entrenamiento mantiene un rendimiento sobresaliente. Se obtuvo un AUC promedio de 0.9929, con exactitud media del 98.96%, sensibilidad del 99.51% y especificidad del 97.80%.
 
 Este desempeño se debe a que las variables transformadas Age_woe y Platelet Count_woe reflejan de forma muy clara el diagnóstico de dengue. Más que mejorar el modelo, los cambios en técnicas de muestreo o balanceo tienen poco efecto, porque estas variables ya capturan de manera directa y efectiva la señal del fenómeno.
+
+
