@@ -432,7 +432,8 @@ summary(metricas)
 # 3. Transformación WoE
 
 ```{r, message=FALSE}
-datos_woe <- read_csv("C:/Users/AMADOR/OneDrive - Universidad de Costa Rica/I-2025/Modelos lineales y de sobrevivencia/Proyecto Modelos/data/datos_woe.csv")
+#datos_woe <- read_csv("C:/Users/AMADOR/OneDrive - Universidad de Costa Rica/I-2025/Modelos lineales y de sobrevivencia/Proyecto Modelos/data/datos_woe.csv")
+datos_woe <- read_csv("../data/datos_woe.csv", show_col_types = FALSE)
 ```
 
 ```{r}
