@@ -1,0 +1,325 @@
+---
+title: "segundo intento"
+author: "Gustavo Amador Fonseca C20451"
+date: "2025-07-07"
+output: html_document
+---
+
+```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(ggcorrplot)
+library(dplyr)
+library(stats)
+library(pROC)
+library(caret)
+library(ggplot2)
+library(boot)
+library(scorecard)
+
+data_raw <- read_csv("../data/Dengue diseases dataset.csv", show_col_types = FALSE)
+
+datos_woe <- read_csv("C:/Users/AMADOR/OneDrive - Universidad de Costa Rica/I-2025/Modelos lineales y de sobrevivencia/Proyecto Modelos/data/datos_woe.csv")
+#View(datos_woe)
+```
+
+# 1. Limpieza de datos
+
+# Limpieza de Datos
+
+```{r}
+#Creación de copia del df original (crudo)
+datos <- data_raw
+names(datos)[9] <- "Dengue Diagnosis"
+# Asegurar que Dengue sea binaria
+datos$`Dengue Diagnosis` <- as.numeric(as.character(datos$`Dengue Diagnosis`))
+#View(datos)
+```
+
+Se están eliminando las observaciones con datos faltantes
+```{r}
+
+# Filtrar observaciones con datos completos en todas las variables potenciales del scope
+datos <- datos %>%
+  select(`Dengue Diagnosis`, Age, Haemoglobin, PDW, `WBC Count`, 
+         `Differential Count`, `RBC PANEL`, `Platelet Count` ) %>%
+  na.omit()
+datos
+```
+
+# 2. Ajuste de modelo con varibles crudas (sin transformaciones)
+
+## Conjunto de variables con Platelet Count
+
+### Validación cruzada cláisca con 5 pliegues
+
+Primeramente una validación cruzada simple y clásico de cinco pliegues para evaluar la capacidad predictiva del modelo logistico final.
+
+```{r, warning=FALSE}
+set.seed(187)
+
+# Crear la variable de clase en el dataset correcto
+datos$DengueFactor <- factor(
+  ifelse(datos$`Dengue Diagnosis` == 1, "Sí", "No"),
+  levels = c("No", "Sí")
+)
+
+# Eliminar NAs si existen en las columnas relevantes
+datos_filtrado <- datos %>%
+  select(DengueFactor, `Platelet Count`) %>%
+  na.omit()
+
+# Control para validación cruzada
+ctrl <- trainControl(
+  method = "cv",           
+  number = 5,              
+  classProbs = TRUE,       
+  summaryFunction = twoClassSummary,
+  savePredictions = "final"
+)
+
+# Entrenar el modelo con Platelet Count (sin WoE)
+modelo_cv_clasico_plat <- train(
+  DengueFactor ~ `Platelet Count`,
+  data = datos_filtrado,
+  method = "glm",
+  metric = "ROC",          
+  trControl = ctrl
+)
+
+print(modelo_cv_clasico_plat)
+
+# AUC promedio en 5 folds
+mean(modelo_cv_clasico_plat$resample$ROC)
+
+
+```
+
+La validación cruzada clásica de 5 pliegues utilizando únicamente la variable Platelet Count mostró un excelente desempeño predictivo. El modelo alcanzó un AUC promedio de 0.9945, con una sensibilidad de 98.67% y una especificidad de 98.58%, lo cual indica una alta capacidad para distinguir correctamente entre pacientes con y sin diagnóstico de dengue usando solo esta variable hematológica.
+
+
+
+
+# 3. Transformación WoE
+
+```{r, message=FALSE}
+# Variables continuas para transformar con WoE
+#vars_continuas <- c("Age", "Haemoglobin", "Platelet Count", "PDW", "WBC Count")
+
+# Crear los bins WoE
+##bins <- woebin(dt = datos, y = "Dengue Diagnosis", x = vars_continuas)
+
+# Aplicar WoE a una copia 
+#woe_transformado <- woebin_ply(dt = datos, bins = bins)
+
+# Extraer solo columnas _woe
+#woe_solo <- select(woe_transformado, ends_with("_woe"))
+
+# Unir sin perder 
+#datos_woe <- bind_cols(datos, woe_solo)
+```
+
+```{r}
+datos_woe
+#View(datos_woe)
+```
+
+La WBC Count_woe fue colapsada en un solo bin: [-Inf, Inf], esto lo que puede significar es que el algoritmo no encontró forma de dividirla en grupos útiles, seguro porque presenta una correlación lineal con Dengue altísima (0.92)... por lo que no se va a considerar la forma woe en la regresión.
+
+## Explorar ajuste del modelo logistico con todas las variables
+
+```{r, warning=FALSE}
+# Asegurar que las variables categóricas están como factores
+datos_woe$`Differential Count` <- as.factor(datos_woe$`Differential Count`)
+datos_woe$`RBC PANEL` <- as.factor(datos_woe$`RBC PANEL`)
+
+# Modelo logístico con todas las variables (originales + transformadas)
+modelo_logit_completo <- glm(`Dengue Diagnosis` ~ 
+                         Age + Age_woe +
+                         Haemoglobin + Haemoglobin_woe +
+                         `Platelet Count` + `Platelet Count_woe` +
+                         PDW + PDW_woe +
+                         `WBC Count` + 
+                         `Differential Count` + 
+                         `RBC PANEL`,
+                       data = datos_woe,
+                       family = binomial)
+
+# Ver el resumen del modelo
+summary(modelo_logit_completo)
+
+```
+
+Se puede ver que ni la varible Platelet Count se ve estadísticamente importante... por loque quitaré WBC Count que es con la que presenta mayor colinealidad con Platelet y Dengue
+
+Metira: ahora dejaré a WBC Counto porque fue la que presentó menor BIC, al contrario de Platelet count
+
+
+### Selección de variables a partir del modelo completo con BIC
+
+Considera las variablaes del ajuste logístico anterior y hace la selección BIC para escogencia de variables
+
+```{r, results='markup', echo=TRUE, message=FALSE, warning=FALSE}
+
+# Filtrar filas completas (sin NA en variables relevantes)
+variables_modelo <- c("Dengue Diagnosis", 
+                      "Age", "Age_woe", "Haemoglobin", 
+                      "Platelet Count", "Platelet Count_woe", 
+                      "PDW", "Differential Count", "RBC PANEL")
+
+datos_modelo <- datos_woe[complete.cases(datos_woe[, variables_modelo]), ]
+
+# Ajustar el modelo (recordar que no considera los NA)
+modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~ 
+                              Age + Age_woe + Haemoglobin + 
+                              `Platelet Count` + `Platelet Count_woe` + `WBC Count`+ 
+                              PDW + `Differential Count` + `RBC PANEL`,
+                            data = datos_modelo,
+                            family = binomial)
+
+# Selección con BIC
+modelo_step_bic <- step(modelo_logit_sin_woe, direction = "both", k = log(nrow(datos_modelo)))
+
+
+summary(modelo_step_bic)
+
+```
+Se puede ver que llegó a las variables más importantes... pero estas al estar tan correlacionadas no muestran una significancia
+estadísticamente considerable, lo que dificulta la interpretación de sus coeficientes y del moedelo en genera, por lo que se descarta
+a pesar de tener un AIC bajo.
+
+
+## Segundo ajuste eliminando variables
+
+### Con variable Platelet Count y Platelet Count_woe
+
+```{r}
+# Ahora quitando las variables woe con valor p de 1, excepto edad_woe
+modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~ 
+                         Age + Age_woe +
+                         Haemoglobin +
+                         `Platelet Count` + `Platelet Count_woe` +
+                         PDW +
+                         #`WBC Count` + 
+                         `Differential Count` + 
+                         `RBC PANEL`,
+                       data = datos_woe,
+                       family = binomial)
+summary(modelo_logit_sin_woe)
+```
+En este ajuste se puede ver que ya la variable Platelet Count_woe se muestra altamente significativa, mientras que la otra varieable con con la que Dengue Diagnosis tenía alta colinealidad no se muestra poco significativa en comparación, entonces se decide continuar con las variables Platelet Count y Platelet Count_woe, ahora es necesario hacer selección de variables
+
+
+### Con variable WBC Count
+
+```{r}
+# Ahora quitando las variables woe con valor p de 1, excepto edad_woe
+modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~ 
+                         Age + Age_woe +
+                         Haemoglobin +
+                        #`Platelet Count` + `Platelet Count_woe` +
+                         PDW +
+                         `WBC Count` + 
+                         `Differential Count` + 
+                         `RBC PANEL`,
+                       data = datos_woe,
+                       family = binomial)
+summary(modelo_logit_sin_woe)
+```
+Tiene un mejor ajuste global penalizado, pero solo una variable significativa marginalmente.
+
+Preferí modelo con variables significativas, como el A, aunque el BIC sea mayor. Así ase interpreta mejor el efecto de cada variable.
+
+
+### Selección de variables anteriores con BIC
+
+Considera las variablaes del ajuste logístico anterior y hace la selección BIC para escogencia de variables
+
+```{r, results='markup', echo=TRUE, message=FALSE, warning=FALSE}
+
+# Filtrar filas completas (sin NA en variables relevantes)
+variables_modelo <- c("Dengue Diagnosis", 
+                      "Age", "Age_woe", "Haemoglobin", 
+                      "Platelet Count", "Platelet Count_woe", 
+                      "PDW", "Differential Count", "RBC PANEL")
+
+datos_modelo <- datos_woe[complete.cases(datos_woe[, variables_modelo]), ]
+
+# Ajustar el modelo (recordar que no considera los NA)
+modelo_logit_sin_woe <- glm(`Dengue Diagnosis` ~ 
+                              Age + Age_woe + Haemoglobin + 
+                              `Platelet Count` + `Platelet Count_woe` + 
+                              PDW + `Differential Count` + `RBC PANEL`,
+                            data = datos_modelo,
+                            family = binomial)
+
+# Selección con BIC
+modelo_step_bic <- step(modelo_logit_sin_woe, direction = "both", k = log(nrow(datos_modelo)))
+
+
+summary(modelo_step_bic)
+
+```
+
+
+En el modelo ajustado se observa que tanto Platelet Count como su transformación Platelet Count_woe resultan estadísticamente significativas. Sin embargo, dado que ambas variables capturan esencialmente la misma información, ya que una es directamente y la otra mediante codificación WoE, es razonable suponer que existe una alta colinealidad entre ellas.
+
+La inclusión simultánea de estas dos variables podría generar redundancia en el modelo y dificultar la interpretación de los coeficientes. Además, podría afectar negativamente la estabilidad del modelo y su capacidad predictiva si se traslada a nuevos datos. Por ello, es mejor eliminar la variable Platelet Count, dado que la variable Platelet Count_woe ofrece una mejor representación con la variable respuesta.
+
+# 4. Modelo logístico final y resumen
+
+Se considera como modelo logistico final el que solo utiliza la variables predictoras de Age_woe y Platelet Count_woe
+
+```{r}
+model_logit_final <- glm(formula = `Dengue Diagnosis` ~ Age_woe + 
+    `Platelet Count_woe`, family = binomial, data = datos_modelo)
+
+summary(model_logit_final)
+```
+
+
+# Ver la capacidad predictiva
+
+## Ver capacidad predictiva con variables transformadas
+
+### Validación cruzada cláisca con 5 pliegues
+
+Primeramente una validación cruzada simple y clásico de cinco pliegues para evaluar la capacidad predictiva del modelo logistico final.
+
+```{r, warning=FALSE}
+set.seed(187)
+library(caret)
+library(pROC)
+
+# la variable debe respuesta es un factor con clase positiva definida
+datos_modelo$DengueFactor <- factor(
+  ifelse(datos_modelo$`Dengue Diagnosis` == 1, "Sí", "No"),
+  levels = c("No", "Sí")
+)
+
+# Control de validación cruzada clásica (5 folds)
+ctrl <- trainControl(
+  method = "cv",           
+  number = 5,              
+  classProbs = TRUE,       
+  summaryFunction = twoClassSummary,
+  savePredictions = "final"
+)
+
+# Entrenar modelo 
+modelo_cv_clasico <- train(
+  DengueFactor ~ Age_woe + `Platelet Count_woe`,
+  data = datos_modelo,
+  method = "glm",
+  metric = "ROC",          
+  trControl = ctrl
+)
+
+print(modelo_cv_clasico)
+
+# Promedio de AUC en los 5 folds
+mean(modelo_cv_clasico$resample$ROC)
+
+```
+
