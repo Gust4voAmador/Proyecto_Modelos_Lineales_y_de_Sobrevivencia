@@ -32,7 +32,8 @@ datos <- data_raw
 names(datos)[9] <- "Dengue Diagnosis"
 # Asegurar que Dengue sea binaria
 datos$`Dengue Diagnosis` <- as.numeric(as.character(datos$`Dengue Diagnosis`))
-#View(datos)
+
+View(datos)
 ```
 
 Se están eliminando las observaciones con datos faltantes

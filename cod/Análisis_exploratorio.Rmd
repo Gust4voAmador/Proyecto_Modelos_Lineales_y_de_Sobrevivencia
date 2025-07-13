@@ -20,6 +20,8 @@ library(readr)
 library(dplyr)
 library(ggplot2)
 library(ggcorrplot)
+library(dplyr)
+library(tidyr)
 
 data_raw <- read_csv("../data/Dengue diseases dataset.csv", show_col_types = FALSE)
 
@@ -316,6 +318,63 @@ print(tabla_resumen)
 ```
 
 El valor de PDW, que representa la variabilidad en el tamaño de las plaquetas, muestra diferencias claras entre los grupos. En los pacientes sin dengue, la media y mediana son considerablemente más altas (30.29 y 35, respectivamente), mientras que en los pacientes con diagnóstico positivo se reducen a 19.34 y 17. Esto sugiere una menor diversidad en el tamaño plaquetario en presencia de la enfermedad. Estas diferencias podrían ser relevantes para entender la dinámica hematológica asociada al dengue.
+
+
+### Age
+
+```{r}
+# Función para obtener la moda
+get_mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+```
+
+
+```{r, echo = FALSE, warning= FALSE}
+# Eliminar filas con NA y crear tabla resumen
+tabla_resumen <- data_clean %>%
+  drop_na(Age, `Dengue Diagnosis`) %>%  # elimina filas con NA en las columnas relevantes
+  group_by(`Dengue Diagnosis`) %>%
+  summarise(
+    Age_mean = round(mean(Age), 2),
+    Age_sd = round(sd(Age), 2),
+    Age_median = round(median(Age), 2),
+    Age_mode = round(get_mode(Age), 2)
+  )
+
+# Mostrar tabla
+print(tabla_resumen)
+```
+
+La variable Age muestra diferencias claras entre los grupos. Los pacientes sin dengue tienen mayor edad media y mediana (47.23 y 43 años).
+En cambio, los casos positivos se concentran en edades más bajas (39.80 y 39 años). La moda también varía entre grupos (34 vs. 45 años).
+Esto sugiere que el dengue afecta con más frecuencia a personas jóvenes.
+
+
+```{r}
+# Filtrar menores de 20 años y contar por diagnóstico
+data_clean %>%
+  filter(Age < 20) %>%
+  count(`Dengue Diagnosis`)
+```
+
+```{r}
+# Filtrar menores de 20 años y contar por diagnóstico
+data_clean %>%
+  filter(Age < 76 & Age>20) %>%
+  count(`Dengue Diagnosis`)
+```
+
+```{r}
+# Filtrar menores de 20 años y contar por diagnóstico
+data_clean %>%
+  filter(Age > 76) %>%
+  count(`Dengue Diagnosis`)
+```
+
+Se puede ver que el rango de edad con mayor proporción de casos positivos en en personas menores a 20 años.
+
 
 ## Boxplots
 

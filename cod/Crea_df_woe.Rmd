@@ -18,6 +18,7 @@ library(ggplot2)
 library(boot)
 library(scorecard)
 
+
 data_raw <- read_csv("../data/Dengue diseases dataset.csv", show_col_types = FALSE)
 
 ```
@@ -67,8 +68,25 @@ datos_woe <- bind_cols(datos, woe_solo)
 ```
 ```{r}
 # Guardar el conjunto de datos transformado con WoE en la carpeta ../data
-write.csv(datos_woe, "../data/datos_woe.csv", row.names = FALSE)
+#write.csv(datos_woe, "../data/datos_woe.csv", row.names = FALSE)
 ```
+
+```{r}
+datos_woe
+```
+
+
+
+```{r}
+bins$Age
+
+```
+Despues de aplicar la transformación WoE donde R elige los bins automáticamente usando un algoritmo de discretización supervisada, y por defecto utiliza el método ChiMerge (Chi-squared merging). Se obtinen los bins de [-Inf,20), [20,76) y [76, Inf), y respectivamente a los intervalos, los valores en ellos se transfroman a los valores 0.49967013, 0.08682491 y -1.63961141.
+
+```{r}
+bins$`Platelet Count`
+```
+
 
 
 
