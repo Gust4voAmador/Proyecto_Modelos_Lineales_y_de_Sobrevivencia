@@ -36,10 +36,6 @@ names(data_clean)[9] <- "Dengue Diagnosis"
 #View(data_clean)
 ```
 
-```{r}
-#Hacer varibla que determina el dengue booleana
-#data_clean$`Dengue Diagnosis` <- as.logical(data_clean$`Dengue Diagnosis`)
-```
 
 # Análisis de correlaciones entre variables predictores
 
@@ -68,7 +64,7 @@ plot_corr <- ggcorrplot(cor_matrix,
 print(plot_corr)
 ```
 ```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
-# Cambia esta ruta por la que desees usar
+# Exportación
 ruta_guardado <- "../img/matriz_correlacion.png"
 
 ggsave(filename = ruta_guardado,
@@ -131,7 +127,7 @@ print(distri_dengue_diagnosis)
 ```
 
 ```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
-# Cambia esta ruta por la que desees usar
+# Exportación
 ruta_guardado <- "../img/Distribucion_Dengue_Diagnosis.png"
 
 ggsave(filename = ruta_guardado,
@@ -168,9 +164,9 @@ dif_count <- ggplot(data_plot, aes(x = `Differential Count`, fill = `Differentia
     y = "Frecuencia"
   ) +
   scale_fill_manual(values = c("0" = "gray70", "1" = "steelblue")) +
-  theme_minimal(base_size = 10) +  # Tamaño base del texto
+  theme_minimal(base_size = 10) + 
   theme(
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5), # Título centrado y más grande
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5), 
     axis.title = element_text(size = 14, face = "bold"),
     axis.text = element_text(size = 11),
     strip.text = element_text(size = 14, face = "bold"),
@@ -182,7 +178,7 @@ print(dif_count)
 
 ```
 ```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
-# Cambia esta ruta por la que desees usar
+# Exportación
 ruta_guardado <- "../img/Distribucion_Differential_Count.png"
 
 ggsave(filename = ruta_guardado,
@@ -230,7 +226,7 @@ rbc <- ggplot(data_plot, aes(x = `RBC PANEL`, fill = `RBC PANEL`)) +
 print(rbc)
 ```
 ```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
-# Cambia esta ruta por la que desees usar
+# Exportación
 ruta_guardado <- "../img/Distribucion_RBC_PANEL.png"
 
 ggsave(filename = ruta_guardado,
@@ -262,7 +258,6 @@ tabla_resumen <- data_clean %>%
     Haemoglobin_median = round(median(Haemoglobin, na.rm = TRUE), 2)
   )
 
-# Mostrar tabla
 print(tabla_resumen)
 ```
 
@@ -279,7 +274,6 @@ tabla_resumen <- data_clean %>%
     WBC_Count_median = round(median(`WBC Count`, na.rm = TRUE), 2)
   )
 
-# Mostrar tabla
 print(tabla_resumen)
 ```
 
@@ -296,7 +290,6 @@ tabla_resumen <- data_clean %>%
     Platelet_Count_median = round(median(`Platelet Count`, na.rm = TRUE), 2)
   )
 
-# Mostrar tabla
 print(tabla_resumen)
 ```
 
@@ -313,7 +306,6 @@ tabla_resumen <- data_clean %>%
     PDW_median = round(median(PDW, na.rm = TRUE), 2)
   )
 
-# Mostrar tabla
 print(tabla_resumen)
 ```
 
@@ -334,7 +326,8 @@ get_mode <- function(x) {
 ```{r, echo = FALSE, warning= FALSE}
 # Eliminar filas con NA y crear tabla resumen
 tabla_resumen <- data_clean %>%
-  drop_na(Age, `Dengue Diagnosis`) %>%  # elimina filas con NA en las columnas relevantes
+  # elimina filas con NA en las columnas relevantes
+  drop_na(Age, `Dengue Diagnosis`) %>%  
   group_by(`Dengue Diagnosis`) %>%
   summarise(
     Age_mean = round(mean(Age), 2),
@@ -343,7 +336,6 @@ tabla_resumen <- data_clean %>%
     Age_mode = round(get_mode(Age), 2)
   )
 
-# Mostrar tabla
 print(tabla_resumen)
 ```
 
@@ -352,8 +344,8 @@ En cambio, los casos positivos se concentran en edades más bajas (39.80 y 39 a�
 Esto sugiere que el dengue afecta con más frecuencia a personas jóvenes.
 
 
+#### Ver proporción de postivos en intervalos WoE
 ```{r}
-# Filtrar menores de 20 años y contar por diagnóstico
 data_clean %>%
   filter(Age < 20) %>%
   count(`Dengue Diagnosis`)
@@ -407,7 +399,7 @@ p4 <- ggplot(data_clean, aes(x = factor(`Dengue Diagnosis`), y = PDW)) +
 ```
 
 ```{r, echo = FALSE, warning= FALSE}
-# Mostrar juntos (si usás patchwork o gridExtra)
+# para mostrar los gráficos juntos
 library(patchwork)
 boxplot1 <- p1 + p2 + p3 + p4
 boxplot1
@@ -418,7 +410,7 @@ boxplot2 <- p3 + p4
 boxplot2
 ```
 ```{r, echo = FALSE, warning= FALSE, results='hide', message = FALSE}
-# Cambia esta ruta por la que desees usar
+# exportación de los gráficos
 ruta_guardado1 <- "../img/Boxplot1.png"
 ruta_guardado2 <- "../img/Boxplot2.png"
 
