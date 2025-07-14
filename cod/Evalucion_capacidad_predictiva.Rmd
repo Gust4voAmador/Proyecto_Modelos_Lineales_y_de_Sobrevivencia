@@ -27,13 +27,13 @@ data_raw <- read_csv("../data/Dengue diseases dataset.csv", show_col_types = FAL
 # Limpieza de Datos
 
 ```{r}
-#Creación de copia del df original (crudo)
+#Creación de copia del df original 
 datos <- data_raw
 names(datos)[9] <- "Dengue Diagnosis"
 # Asegurar que Dengue sea binaria
 datos$`Dengue Diagnosis` <- as.numeric(as.character(datos$`Dengue Diagnosis`))
 
-View(datos)
+#View(datos)
 ```
 
 Se están eliminando las observaciones con datos faltantes
@@ -51,7 +51,7 @@ datos
 
 ## Conjunto de variables con Platelet Count
 
-### Validación cruzada cláisca con 5 pliegues
+### Validación cruzada cláisca con 5 pliegues (No se considera en la metodología porque es redundante con el método de validación repetida)
 
 Primeramente una validación cruzada simple y clásico de cinco pliegues para evaluar la capacidad predictiva del modelo logistico final.
 
@@ -64,7 +64,7 @@ datos$DengueFactor <- factor(
   levels = c("No", "Sí")
 )
 
-# Eliminar NAs si existen en las columnas relevantes
+# Eliminar NAs si existen
 datos_filtrado <- datos %>%
   select(DengueFactor, `Platelet Count`) %>%
   na.omit()
@@ -116,7 +116,7 @@ datos_filtrado <- datos %>%
 
 # Proporciones del conjunto de entrenamiento
 train_props <- c(0.7, 0.5, 0.3, 0.1)
-reps <- 10
+reps <- 100
 
 # Control de validación cruzada
 ctrl <- trainControl(
@@ -170,8 +170,7 @@ La validación cruzada estratificada sin balanceo, realizada con diferentes prop
 ### Validación cruzada repetida con Platelet Count (30% training)
 
 ```{r, warning=FALSE, , message=FALSE}
-
-
+# Semilla escogida para mantener los resultados (fue al azar)
 set.seed(187)
 
 # Definir variable binaria en el dataset correcto
@@ -247,7 +246,7 @@ La validación cruzada repetida, realizada con 100 iteraciones utilizando solo e
 
 ## Conjunto de variables con WBC Count
 
-### Validación cruzada cláisca con 5 pliegues
+### Validación cruzada cláisca con 5 pliegues (No se considera en la metodología porque es redundante con el método de validación repetida)
 
 ```{r, warning=FALSE}
 set.seed(187)
@@ -307,7 +306,7 @@ datos_filtrado <- datos %>%
 
 # Proporciones del conjunto de entrenamiento
 train_props <- c(0.7, 0.5, 0.3, 0.1)
-reps <- 10
+reps <- 100
 
 # Control de validación cruzada
 ctrl <- trainControl(
@@ -432,12 +431,10 @@ summary(metricas)
 
 # 3. Transformación WoE
 
-```{r, message=FALSE}
-#datos_woe <- read_csv("C:/Users/AMADOR/OneDrive - Universidad de Costa Rica/I-2025/Modelos lineales y de sobrevivencia/Proyecto Modelos/data/datos_woe.csv")
-datos_woe <- read_csv("../data/datos_woe.csv", show_col_types = FALSE)
-```
 
-```{r}
+```{r, message=FALSE}
+#Se importa la base de datos con las variables numéricas transformadas por WoE
+datos_woe <- read_csv("../data/datos_woe.csv", show_col_types = FALSE)
 datos_woe
 #View(datos_woe)
 ```
@@ -600,7 +597,7 @@ summary(model_logit_final)
 
 ## Ver capacidad predictiva con variables transformadas
 
-### Validación cruzada cláisca con 5 pliegues
+### Validación cruzada cláisca con 5 pliegues (No se considera en la metodología porque es redundante con el método de validación repetida)
 
 Primeramente una validación cruzada simple y clásico de cinco pliegues para evaluar la capacidad predictiva del modelo logistico final.
 
@@ -658,7 +655,7 @@ datos_modelo$DengueFactor <- factor(
 train_props <- c(0.7, 0.5, 0.3, 0.1)
 
 # Repeticiones por proporción de conjunto de training
-reps <- 10
+reps <- 100
 
 # validación cruzada
 ctrl <- trainControl(
@@ -713,7 +710,7 @@ print(resumen_estratificados)
 
 ```
 
-Se evaluó el modelo logístico utilizando validación cruzada estratificada con diferentes tamaños de conjunto de entrenamiento (10%, 30%, 50% y 70%), repitiendo el proceso 10 veces por proporción. Los resultados muestran una alta estabilidad y capacidad predictiva del modelo, con valores promedio de AUC superiores a 0.99 en todos los casos. El mejor desempeño se obtuvo con el 50% de los datos de entrenamiento (AUC promedio = 0.9945), lo que confirma que incluso con muestras relativamente pequeñas, el modelo logra distinguir eficazmente entre casos positivos y negativos de dengue.
+Se evaluó el modelo logístico utilizando validación cruzada estratificada con diferentes tamaños de conjunto de entrenamiento (10%, 30%, 50% y 70%), repitiendo el proceso 100 veces por proporción. Los resultados muestran una alta estabilidad y capacidad predictiva del modelo, con valores promedio de AUC superiores a 0.99 en todos los casos. El mejor desempeño se obtuvo con el 50% de los datos de entrenamiento (AUC promedio = 0.9945), lo que confirma que incluso con muestras relativamente pequeñas, el modelo logra distinguir eficazmente entre casos positivos y negativos de dengue.
 
 ## Balanceo artificial de las clases con upSample
 
@@ -729,7 +726,7 @@ datos_modelo$DengueFactor <- factor(
 
 train_props <- c(0.7, 0.5, 0.3, 0.1)
 
-reps <- 10
+reps <- 100
 
 # Control validación cruzada
 ctrl <- trainControl(

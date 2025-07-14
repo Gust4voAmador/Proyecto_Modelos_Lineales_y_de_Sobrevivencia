@@ -23,12 +23,12 @@ data_raw <- read_csv("../data/Dengue diseases dataset.csv", show_col_types = FAL
 
 ```
 
-# 1. Limpieza de datos
+# Limpieza de datos
 
 # Limpieza de Datos
 
 ```{r}
-#Creación de copia del df original (crudo)
+#Creación de copia del df original
 datos <- data_raw
 names(datos)[9] <- "Dengue Diagnosis"
 # Asegurar que Dengue sea binaria
@@ -36,10 +36,9 @@ datos$`Dengue Diagnosis` <- as.numeric(as.character(datos$`Dengue Diagnosis`))
 #View(datos)
 ```
 
-Se están eliminando las observaciones con datos faltantes
-```{r}
 
-# Filtrar observaciones con datos completos en todas las variables potenciales del scope
+```{r}
+# Se están eliminando las observaciones con datos faltantes
 datos <- datos %>%
   select(`Dengue Diagnosis`, Age, Haemoglobin, PDW, `WBC Count`, 
          `Differential Count`, `RBC PANEL`, `Platelet Count` ) %>%
@@ -48,7 +47,7 @@ datos
 ```
 
 
-# 3. Transformación WoE
+# Transformación WoE
 
 ```{r, message=FALSE}
 # Variables continuas para transformar con WoE
@@ -67,26 +66,28 @@ woe_solo <- select(woe_transformado, ends_with("_woe"))
 datos_woe <- bind_cols(datos, woe_solo)
 ```
 ```{r}
-# Guardar el conjunto de datos transformado con WoE en la carpeta ../data
-#write.csv(datos_woe, "../data/datos_woe.csv", row.names = FALSE)
+# Guardar el conjunto de datos transformado con WoE en la carpeta data
+write.csv(datos_woe, "../data/datos_woe.csv", row.names = FALSE)
 ```
 
 ```{r}
+# Visualizar la base de datos
 datos_woe
 ```
 
 
 
 ```{r}
+# Visualizar características de las bins en la variable Age para analizar si tiene coherencia
 bins$Age
-
 ```
 Despues de aplicar la transformación WoE donde R elige los bins automáticamente usando un algoritmo de discretización supervisada, y por defecto utiliza el método ChiMerge (Chi-squared merging). Se obtinen los bins de [-Inf,20), [20,76) y [76, Inf), y respectivamente a los intervalos, los valores en ellos se transfroman a los valores 0.49967013, 0.08682491 y -1.63961141.
 
 ```{r}
+# Visualizar características de las bins en la variable Platelet Count para analizar si tiene coherencia
 bins$`Platelet Count`
 ```
 
-
+Se puede observar que tamben realiza 3 bins, donde se tienen 3 categorías de cantidad de plaquetas, donde la mayoría estan ubicadas en baja cantidad de plaquetas (menor a 90000)
 
 

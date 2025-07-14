@@ -358,18 +358,17 @@ display: none;
 
 
 <div id="limpieza-de-datos" class="section level1">
-<h1>1. Limpieza de datos</h1>
+<h1>Limpieza de datos</h1>
 </div>
 <div id="limpieza-de-datos-1" class="section level1">
 <h1>Limpieza de Datos</h1>
-<pre class="r"><code>#Creación de copia del df original (crudo)
+<pre class="r"><code>#Creación de copia del df original
 datos &lt;- data_raw
 names(datos)[9] &lt;- &quot;Dengue Diagnosis&quot;
 # Asegurar que Dengue sea binaria
 datos$`Dengue Diagnosis` &lt;- as.numeric(as.character(datos$`Dengue Diagnosis`))
 #View(datos)</code></pre>
-<p>Se están eliminando las observaciones con datos faltantes</p>
-<pre class="r"><code># Filtrar observaciones con datos completos en todas las variables potenciales del scope
+<pre class="r"><code># Se están eliminando las observaciones con datos faltantes
 datos &lt;- datos %&gt;%
   select(`Dengue Diagnosis`, Age, Haemoglobin, PDW, `WBC Count`, 
          `Differential Count`, `RBC PANEL`, `Platelet Count` ) %&gt;%
@@ -392,13 +391,13 @@ datos</code></pre>
 ## # ℹ 2 more variables: `RBC PANEL` &lt;dbl&gt;, `Platelet Count` &lt;dbl&gt;</code></pre>
 </div>
 <div id="transformación-woe" class="section level1">
-<h1>3. Transformación WoE</h1>
+<h1>Transformación WoE</h1>
 <pre class="r"><code># Variables continuas para transformar con WoE
 vars_continuas &lt;- c(&quot;Age&quot;, &quot;Haemoglobin&quot;, &quot;Platelet Count&quot;, &quot;PDW&quot;, &quot;WBC Count&quot;)
 
 # Crear los bins WoE
 bins &lt;- woebin(dt = datos, y = &quot;Dengue Diagnosis&quot;, x = vars_continuas)</code></pre>
-<pre><code>## ✔ Binning on 931 rows and 6 columns in 00:00:02</code></pre>
+<pre><code>## ✔ Binning on 931 rows and 6 columns in 00:00:01</code></pre>
 <pre class="r"><code># Aplicar WoE a una copia 
 woe_transformado &lt;- woebin_ply(dt = datos, bins = bins)</code></pre>
 <pre><code>## ✔ Woe transformating on 931 rows and 5 columns in 00:00:00</code></pre>
@@ -407,9 +406,10 @@ woe_solo &lt;- select(woe_transformado, ends_with(&quot;_woe&quot;))
 
 # Unir sin perder 
 datos_woe &lt;- bind_cols(datos, woe_solo)</code></pre>
-<pre class="r"><code># Guardar el conjunto de datos transformado con WoE en la carpeta ../data
-#write.csv(datos_woe, &quot;../data/datos_woe.csv&quot;, row.names = FALSE)</code></pre>
-<pre class="r"><code>datos_woe</code></pre>
+<pre class="r"><code># Guardar el conjunto de datos transformado con WoE en la carpeta data
+write.csv(datos_woe, &quot;../data/datos_woe.csv&quot;, row.names = FALSE)</code></pre>
+<pre class="r"><code># Visualizar la base de datos
+datos_woe</code></pre>
 <pre><code>## # A tibble: 931 × 13
 ##    `Dengue Diagnosis`   Age Haemoglobin   PDW `WBC Count` `Differential Count`
 ##                 &lt;dbl&gt; &lt;dbl&gt;       &lt;dbl&gt; &lt;dbl&gt;       &lt;dbl&gt;                &lt;dbl&gt;
@@ -427,7 +427,8 @@ datos_woe &lt;- bind_cols(datos, woe_solo)</code></pre>
 ## # ℹ 7 more variables: `RBC PANEL` &lt;dbl&gt;, `Platelet Count` &lt;dbl&gt;, Age_woe &lt;dbl&gt;,
 ## #   Haemoglobin_woe &lt;dbl&gt;, `Platelet Count_woe` &lt;dbl&gt;, PDW_woe &lt;dbl&gt;,
 ## #   `WBC Count_woe` &lt;dbl&gt;</code></pre>
-<pre class="r"><code>bins$Age</code></pre>
+<pre class="r"><code># Visualizar características de las bins en la variable Age para analizar si tiene coherencia
+bins$Age</code></pre>
 <pre><code>##    variable       bin count count_distr   neg   pos   posprob         woe
 ##      &lt;char&gt;    &lt;char&gt; &lt;int&gt;       &lt;num&gt; &lt;int&gt; &lt;int&gt;     &lt;num&gt;       &lt;num&gt;
 ## 1:      Age [-Inf,20)   134  0.14393126    30   104 0.7761194  0.49967013
@@ -444,7 +445,8 @@ defecto utiliza el método ChiMerge (Chi-squared merging). Se obtinen los
 bins de [-Inf,20), [20,76) y [76, Inf), y respectivamente a los
 intervalos, los valores en ellos se transfroman a los valores
 0.49967013, 0.08682491 y -1.63961141.</p>
-<pre class="r"><code>bins$`Platelet Count`</code></pre>
+<pre class="r"><code># Visualizar características de las bins en la variable Platelet Count para analizar si tiene coherencia
+bins$`Platelet Count`</code></pre>
 <pre><code>##          variable            bin count count_distr   neg   pos    posprob
 ##            &lt;char&gt;         &lt;char&gt; &lt;int&gt;       &lt;num&gt; &lt;int&gt; &lt;int&gt;      &lt;num&gt;
 ## 1: Platelet Count   [-Inf,90000)   455   0.4887218     2   453 0.99560440
@@ -455,6 +457,9 @@ intervalos, los valores en ellos se transfroman a los valores
 ## 1:  4.679222 3.3280562 9.236531  90000             FALSE
 ## 2:  2.811825 0.7329608 9.236531 150000             FALSE
 ## 3: -5.325084 5.1755144 9.236531    Inf             FALSE</code></pre>
+<p>Se puede observar que tamben realiza 3 bins, donde se tienen 3
+categorías de cantidad de plaquetas, donde la mayoría estan ubicadas en
+baja cantidad de plaquetas (menor a 90000)</p>
 </div>
 
 
